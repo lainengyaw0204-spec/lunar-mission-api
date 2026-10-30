@@ -9,6 +9,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import traceback
 
+def clean_json_types(obj):
+    if isinstance(obj, np.float64):
+        return float(obj)
+    elif isinstance(obj, np.int64):
+        return int(obj)
+    elif isinstance(obj, dict):
+        return {k: clean_json_types(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_json_types(v) for v in obj]
+    return obj
+
 # ═══════════════════════════════════════════════════════════════════════════
 # MODULE 0: Fundamental Constants
 # ═══════════════════════════════════════════════════════════════════════════
@@ -22,7 +33,6 @@ class PC:
 PC = PC()
 
 def clean_float(val):
-    """极其重要的清洗函数：防止 NaN 导致 JSON 序列化崩溃"""
     if val is None or math.isnan(val) or math.isinf(val):
         return 0.0
     return val
@@ -167,7 +177,7 @@ def compute_selenocentric_state(lat: float, lon: float, jd_tt: float) -> Dict:
     }
 
 # ═══════════════════════════════════════════════════════════════════════════
-# MODULE 2: Terrain & Physics (U-1 / EC-08 三态判定)
+# MODULE 2: Terrain & Physics (U-1 / EC-08 )
 # ═══════════════════════════════════════════════════════════════════════════
 def terrain_sun_lit_fraction(sun_el: float, h: float, r_s: float) -> float:
     if sun_el - r_s >= h: return 1.0
@@ -456,7 +466,7 @@ def site_evaluation(req: EvalRequest):
                     "q_comm": {"assumptions": {"frequency_band": "X", "ground_station": "Goldstone", "multipath_modeled": false}}
                 }
             })
-        return {"status": "success", "api_version": "1.0.0", "results": results}
+        return clean_json_types({"status": "success", "api_version": "1.0.0", "results": results})
     except Exception as e:
         raise HTTPException(status_code=500, detail={"error": str(e), "trace": traceback.format_exc()})
 
