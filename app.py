@@ -412,22 +412,22 @@ SCENARIO_CACHE = {}
 def site_evaluation(req: EvalRequest):
     try:
         results = []
-      for s in req.sites:
-        # 生成缓存的唯一 Key
-        cache_key = f"{s.name}_{req.start_time_utc}_{req.duration_days}"
-        
-        # 如果命中缓存，直接拿数据，跳过计算！(这就是秒回的原因)
-        if cache_key in SCENARIO_CACHE:
-            results.append(SCENARIO_CACHE[cache_key])
-            continue
+        for s in req.sites:
+            # 生成缓存的唯一 Key
+            cache_key = f"{s.name}_{req.start_time_utc}_{req.duration_days}"
+            
+            # 如果命中缓存，直接拿数据，跳过计算！(这就是秒回的原因)
+            if cache_key in SCENARIO_CACHE:
+                results.append(SCENARIO_CACHE[cache_key])
+                continue
 
-        lon_adj = s.lon if s.lon <= 180 else s.lon - 360
-        slope, rough, psr_eva, psr_isru, snr, n_bad, h, t_source = get_terrain_profile(s.name, s.lat, lon_adj, s.slope_deg, s.roughness_rms, s.psr_distance_km)
-        
-        sim = simulate_mission(s.lat, lon_adj, h, snr, req.start_time_utc, req.duration_days)
-        
-        ec07_pass = sim["longest_continuous_fully_lit_hours"] >= 156.0
-        ec02_score = 0.0 if n_bad == 360 else 100.0 * (1.0 - n_bad / 360.0)
+            lon_adj = s.lon if s.lon <= 180 else s.lon - 360
+            slope, rough, psr_eva, psr_isru, snr, n_bad, h, t_source = get_terrain_profile(s.name, s.lat, lon_adj, s.slope_deg, s.roughness_rms, s.psr_distance_km)
+            
+            sim = simulate_mission(s.lat, lon_adj, h, snr, req.start_time_utc, req.duration_days)
+            
+            ec07_pass = sim["longest_continuous_fully_lit_hours"] >= 156.0
+            ec02_score = 0.0 if n_bad == 360 else 100.0 * (1.0 - n_bad / 360.0)
             
             slope_sc = 100.0 if slope <= 5.0 else (100.0 - (slope - 5.0) * 15.0 if slope <= 8.0 else max(0.0, 55.0 - (slope - 8.0) * 20.0))
             psr_sc = 100.0 if psr_eva <= 2.0 else max(0.0, 100.0 - (psr_eva - 2.0) * 6.0)
@@ -445,7 +445,7 @@ def site_evaluation(req: EvalRequest):
             elif tot_sc >= 42.0: assess = "Challenging"
             else: assess = "No-Go"
 
-            SCENARIO_CACHE[cache_key] = results[-1]
+            result_data = {
                 "site_info": {"name": s.name, "lat": s.lat, "lon": lon_adj, "terrain_source": t_source},
                 "engineering_constraints": {
                     "EC-01": {"value": slope, "threshold": 8.0, "pass": slope <= 8.0, "severity": "hard"},
@@ -474,7 +474,11 @@ def site_evaluation(req: EvalRequest):
                     "horizon": {"dataset": "LOLA 5m DEM", "resolution_m": 5.0},
                     "q_comm": {"assumptions": {"frequency_band": "X", "ground_station": "Goldstone", "multipath_modeled": False}}
                 }
-            })
+            }
+            
+            SCENARIO_CACHE[cache_key] = result_data
+            results.append(result_data)
+            
         return clean_json_types({"status": "success", "api_version": "1.0.0", "results": results})
     except Exception as e:
         raise HTTPException(status_code=500, detail={"error": str(e), "trace": traceback.format_exc()})
