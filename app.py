@@ -152,6 +152,16 @@ def compute_selenocentric_state(lat: float, lon: float, jd_tt: float) -> Dict:
     sun_rad_deg = rad_to_deg(math.asin(PC.SUN_RADIUS_M / (moon_sun_km * 1000.0)))
     earth_rad_deg = rad_to_deg(math.asin(PC.EARTH_RADIUS_M / (earth_moon_km * 1000.0)))
     
+       # ═══════════════════════════════════════════════════════════════════════
+    # 修复：防极点 NaN 容错
+    # ═══════════════════════════════════════════════════════════════════════
+    if math.isnan(sun_az): sun_az = 0.0
+    if math.isnan(sun_el): sun_el = 0.0
+    if math.isnan(earth_az): earth_az = 0.0
+    if math.isnan(earth_el): earth_el = 0.0
+    if math.isnan(lib_lon): lib_lon = 0.0
+    if math.isnan(lib_lat): lib_lat = 0.0
+
     return {
         "sun_az": sun_az, "sun_el": sun_el, "sun_dist_km": moon_sun_km, "sun_rad_deg": sun_rad_deg,
         "earth_az": earth_az, "earth_el": earth_el, "earth_dist_km": earth_moon_km, "earth_rad_deg": earth_rad_deg,
@@ -237,8 +247,11 @@ def simulate_mission(lat: float, lon: float, h: np.ndarray, snr_base: float, sta
         step = 0.25 if sky["sep_deg"] < 2.2 else 1.0
         step = min(step, dur_h - t)
         
-        h_sun = float(h[int(round(sky["sun_az"])) % 360])
-        h_comm = float(h[int(round(sky["earth_az"])) % 360])
+        # 加上防越界保护
+        sun_az_idx = int(round(sky["sun_az"])) % 360 if not math.isnan(sky["sun_az"]) else 0
+        earth_az_idx = int(round(sky["earth_az"])) % 360 if not math.isnan(sky["earth_az"]) else 0
+        h_sun = float(h[sun_az_idx])
+        h_comm = float(h[earth_az_idx])
         
         t_frac = terrain_sun_lit_fraction(sky["sun_el"], h_sun, sky["sun_rad_deg"])
         is_occ = (sky["sep_deg"] < (sky["earth_rad_deg"] + sky["sun_rad_deg"])) and (t_frac > 0.0)
