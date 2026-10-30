@@ -463,7 +463,7 @@ def site_evaluation(req: EvalRequest):
                 "data_provenance": {
                     "slope": {"dataset": "LOLA 5m DEM", "algorithm": "Horn 3x3"},
                     "horizon": {"dataset": "LOLA 5m DEM", "resolution_m": 5.0},
-                    "q_comm": {"assumptions": {"frequency_band": "X", "ground_station": "Goldstone", "multipath_modeled": false}}
+                    "q_comm": {"assumptions": {"frequency_band": "X", "ground_station": "Goldstone", "multipath_modeled": False}}
                 }
             })
         return clean_json_types({"status": "success", "api_version": "1.0.0", "results": results})
