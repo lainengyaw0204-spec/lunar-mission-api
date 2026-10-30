@@ -357,7 +357,7 @@ class EvalRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "engine_version": "v6.0", "scenarios_cached": False, "dem_loaded": True}
+    return {"status": "ok", "engine_version": "v6.1", "scenarios_cached": True, "dem_loaded": True}
 
 @app.get("/api/parameters")
 def get_params():
@@ -406,19 +406,28 @@ def get_environment(lat: float = Query(..., ge=-90, le=-80), lon: float = Query(
         "data_quality": {"resolution_m": 5.0, "synthetic": t_source != "lola_dem_synthetic", "engineering_grade": False},
         "notes": ["Q_comm is a relative communication quality index, based on simplified geometry, not a flight-certified link budget."]
     }
+SCENARIO_CACHE = {}
 
 @app.post("/api/site-evaluation")
 def site_evaluation(req: EvalRequest):
     try:
         results = []
-        for s in req.sites:
-            lon_adj = s.lon if s.lon <= 180 else s.lon - 360
-            slope, rough, psr_eva, psr_isru, snr, n_bad, h, t_source = get_terrain_profile(s.name, s.lat, lon_adj, s.slope_deg, s.roughness_rms, s.psr_distance_km)
-            
-            sim = simulate_mission(s.lat, lon_adj, h, snr, req.start_time_utc, req.duration_days)
-            
-            ec07_pass = sim["longest_continuous_fully_lit_hours"] >= 156.0
-            ec02_score = 0.0 if n_bad == 360 else 100.0 * (1.0 - n_bad / 360.0)
+      for s in req.sites:
+        # 生成缓存的唯一 Key
+        cache_key = f"{s.name}_{req.start_time_utc}_{req.duration_days}"
+        
+        # 如果命中缓存，直接拿数据，跳过计算！(这就是秒回的原因)
+        if cache_key in SCENARIO_CACHE:
+            results.append(SCENARIO_CACHE[cache_key])
+            continue
+
+        lon_adj = s.lon if s.lon <= 180 else s.lon - 360
+        slope, rough, psr_eva, psr_isru, snr, n_bad, h, t_source = get_terrain_profile(s.name, s.lat, lon_adj, s.slope_deg, s.roughness_rms, s.psr_distance_km)
+        
+        sim = simulate_mission(s.lat, lon_adj, h, snr, req.start_time_utc, req.duration_days)
+        
+        ec07_pass = sim["longest_continuous_fully_lit_hours"] >= 156.0
+        ec02_score = 0.0 if n_bad == 360 else 100.0 * (1.0 - n_bad / 360.0)
             
             slope_sc = 100.0 if slope <= 5.0 else (100.0 - (slope - 5.0) * 15.0 if slope <= 8.0 else max(0.0, 55.0 - (slope - 8.0) * 20.0))
             psr_sc = 100.0 if psr_eva <= 2.0 else max(0.0, 100.0 - (psr_eva - 2.0) * 6.0)
@@ -436,7 +445,7 @@ def site_evaluation(req: EvalRequest):
             elif tot_sc >= 42.0: assess = "Challenging"
             else: assess = "No-Go"
 
-            results.append({
+            SCENARIO_CACHE[cache_key] = results[-1]
                 "site_info": {"name": s.name, "lat": s.lat, "lon": lon_adj, "terrain_source": t_source},
                 "engineering_constraints": {
                     "EC-01": {"value": slope, "threshold": 8.0, "pass": slope <= 8.0, "severity": "hard"},
