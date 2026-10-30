@@ -7,6 +7,7 @@ from typing import Dict, Tuple, List, Optional
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+import traceback
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MODULE 0: Fundamental Constants
@@ -19,6 +20,12 @@ class PC:
     SUN_RADIUS_M: float = 6.957e8
 
 PC = PC()
+
+def clean_float(val):
+    """极其重要的清洗函数：防止 NaN 导致 JSON 序列化崩溃"""
+    if val is None or math.isnan(val) or math.isinf(val):
+        return 0.0
+    return val
 
 def jd_from_iso(iso_str: str) -> float:
     try:
@@ -152,20 +159,11 @@ def compute_selenocentric_state(lat: float, lon: float, jd_tt: float) -> Dict:
     sun_rad_deg = rad_to_deg(math.asin(PC.SUN_RADIUS_M / (moon_sun_km * 1000.0)))
     earth_rad_deg = rad_to_deg(math.asin(PC.EARTH_RADIUS_M / (earth_moon_km * 1000.0)))
     
-       # ═══════════════════════════════════════════════════════════════════════
-    # 修复：防极点 NaN 容错
-    # ═══════════════════════════════════════════════════════════════════════
-    if math.isnan(sun_az): sun_az = 0.0
-    if math.isnan(sun_el): sun_el = 0.0
-    if math.isnan(earth_az): earth_az = 0.0
-    if math.isnan(earth_el): earth_el = 0.0
-    if math.isnan(lib_lon): lib_lon = 0.0
-    if math.isnan(lib_lat): lib_lat = 0.0
-
     return {
-        "sun_az": sun_az, "sun_el": sun_el, "sun_dist_km": moon_sun_km, "sun_rad_deg": sun_rad_deg,
-        "earth_az": earth_az, "earth_el": earth_el, "earth_dist_km": earth_moon_km, "earth_rad_deg": earth_rad_deg,
-        "sep_deg": spherical_law_of_cosines(sun_az, sun_el, earth_az, earth_el), "libration_lon_deg": lib_lon, "libration_lat_deg": lib_lat
+        "sun_az": clean_float(sun_az), "sun_el": clean_float(sun_el), "sun_dist_km": clean_float(moon_sun_km), "sun_rad_deg": clean_float(sun_rad_deg),
+        "earth_az": clean_float(earth_az), "earth_el": clean_float(earth_el), "earth_dist_km": clean_float(earth_moon_km), "earth_rad_deg": clean_float(earth_rad_deg),
+        "sep_deg": clean_float(spherical_law_of_cosines(sun_az, sun_el, earth_az, earth_el)), 
+        "libration_lon_deg": clean_float(lib_lon), "libration_lat_deg": clean_float(lib_lat)
     }
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -202,7 +200,6 @@ def build_rugged_lunar_horizon(base: float, peaks: List[Tuple[float, float, floa
         h[az] = max(-1.2, round(val, 2))
     return h
 
-# 更新为 PM 要求的 4 地点，并增加 EC-02 的预估值
 TERRAIN_DATA = {
     "de Gerlache Rim 2": {"slope": 1.34, "rough": 0.32, "psr_eva": 0.8, "psr_isru": 3.2, "snr": 16.8, "n_bad": 0, "h": build_rugged_lunar_horizon(1.3, [(142, 4.9, 24), (305, 4.2, 28), (35, 1.8, 18)], 3)},
     "Malapert Massif":   {"slope": 4.20, "rough": 0.30, "psr_eva": 1.4, "psr_isru": 6.5, "snr": 19.4, "n_bad": 12, "h": build_rugged_lunar_horizon(0.3, [(210, 2.3, 25), (110, 1.2, 20)], 11)},
@@ -226,7 +223,7 @@ def get_terrain_profile(name: str, lat: float, lon: float, ds: float, dr: float,
 def simulate_mission(lat: float, lon: float, h: np.ndarray, snr_base: float, start_utc: str, dur_days: int) -> Dict:
     jd0 = jd_from_iso(start_utc)
     dur_h = float(dur_days * 24)
-    tl, telem, events, vis_windows = [], [], [], []
+    tl, telem, events = [], [], []
     
     t = 0.0
     prev_sun, prev_comm = None, None
@@ -235,27 +232,25 @@ def simulate_mission(lat: float, lon: float, h: np.ndarray, snr_base: float, sta
     max_dark, cur_dark = 0.0, 0.0
     longest_lit, cur_lit = 0.0, 0.0
     
-    # EC-08 三态统计
     vis_h, part_h, occ_h = 0.0, 0.0, 0.0
-    
     active_evt = None
-    active_window = None
 
     while t < dur_h:
         jd_tt = jd_tt_from_jd_utc(jd0 + t / 24.0)
         sky = compute_selenocentric_state(lat, lon, jd_tt)
-        step = 0.25 if sky["sep_deg"] < 2.2 else 1.0
-        step = min(step, dur_h - t)
         
-        # 加上防越界保护
+        # 防越界保护
         sun_az_idx = int(round(sky["sun_az"])) % 360 if not math.isnan(sky["sun_az"]) else 0
         earth_az_idx = int(round(sky["earth_az"])) % 360 if not math.isnan(sky["earth_az"]) else 0
         h_sun = float(h[sun_az_idx])
         h_comm = float(h[earth_az_idx])
         
+        step = 0.25 if sky["sep_deg"] < 2.2 else 1.0
+        step = min(step, dur_h - t)
+        
         t_frac = terrain_sun_lit_fraction(sky["sun_el"], h_sun, sky["sun_rad_deg"])
         is_occ = (sky["sep_deg"] < (sky["earth_rad_deg"] + sky["sun_rad_deg"])) and (t_frac > 0.0)
-        net = t_frac * (0.0 if is_occ and sky["sep_deg"] < sky["earth_rad_deg"] else 1.0) # Simplified for now
+        net = t_frac * (0.0 if is_occ and sky["sep_deg"] < sky["earth_rad_deg"] else 1.0)
         
         if net >= 0.95:
             s_state = "FULLY_LIT"
@@ -292,7 +287,6 @@ def simulate_mission(lat: float, lon: float, h: np.ndarray, snr_base: float, sta
         if net > 0.15: batt = min(100.0, batt + step * 8.0 * net)
         else: batt = max(0.0, batt - step * 2.2)
         
-        # 事件统计
         if is_occ:
             if active_evt is None:
                 active_evt = {"start_h": round(t, 2), "end_h": round(t + step, 2), "min_sun_factor": round(net, 3)}
@@ -305,20 +299,18 @@ def simulate_mission(lat: float, lon: float, h: np.ndarray, snr_base: float, sta
                 events.append(active_evt)
                 active_evt = None
                 
-        # Timeline 记录
         if s_state != prev_sun or c_state != prev_comm:
             tl.append({
                 "start_h": round(t, 2), "end_h": round(t + step, 2), "solar_power": s_state, "earth_comm": c_state,
-                "is_earth_occultation": is_occ, "q_comm_index": round(q_comm, 1), "snr_db": snr_val, "battery_soc_pct": round(batt, 1)
+                "is_earth_occultation": is_occ, "q_comm_index": round(q_comm, 1), "snr_db": clean_float(snr_val), "battery_soc_pct": round(batt, 1)
             })
             prev_sun, prev_comm = s_state, c_state
         elif tl:
             tl[-1]["end_h"] = round(t + step, 2)
 
-        # 遥测记录 (2小时间隔)
         if abs(t % 2.0) < 1e-6:
             telem.append({
-                "t_h": round(t, 1), "sun_el": round(sky["sun_el"], 2), "earth_el": round(sky["earth_el"], 2),
+                "t_h": round(t, 1), "sun_el": clean_float(sky["sun_el"]), "earth_el": clean_float(sky["earth_el"]),
                 "q_comm_index": round(q_comm, 1), "battery_soc_pct": round(batt, 1)
             })
         t += step
@@ -351,7 +343,7 @@ class SiteInput(BaseModel):
 class EvalRequest(BaseModel):
     sites: List[SiteInput]
     start_time_utc: str = "2028-09-27T00:00:00Z"
-    duration_days: int = Field(30, ge=1, le=30) # 30 天
+    duration_days: int = Field(30, ge=1, le=30)
 
 @app.get("/health")
 def health():
@@ -384,18 +376,21 @@ def get_environment(lat: float = Query(..., ge=-90, le=-80), lon: float = Query(
     jd_tt = jd_tt_from_jd_utc(jd_from_iso(time))
     sky = compute_selenocentric_state(lat, lon, jd_tt)
     
-    # 简单估计地平线遮挡
     _, _, _, _, _, _, h, t_source = get_terrain_profile("", lat, lon, 4.2, 0.35, 0.8)
-    h_sun = float(h[int(round(sky["sun_az"])) % 360])
-    h_earth = float(h[int(round(sky["earth_az"])) % 360])
+    
+    sun_az_idx = int(round(sky["sun_az"])) % 360 if not math.isnan(sky["sun_az"]) else 0
+    earth_az_idx = int(round(sky["earth_az"])) % 360 if not math.isnan(sky["earth_az"]) else 0
+    
+    h_sun = float(h[sun_az_idx])
+    h_earth = float(h[earth_az_idx])
     
     return {
         "observer_definition": "The lander site, fixed on the lunar surface",
         "location": {"lat": lat, "lon": lon},
         "sky": {
-            "sun": {"azimuth": round(sky["sun_az"], 2), "elevation": round(sky["sun_el"], 2), "above_horizon": sky["sun_el"] > h_sun},
-            "earth": {"azimuth": round(sky["earth_az"], 2), "elevation": round(sky["earth_el"], 2), "above_horizon": sky["earth_el"] > h_earth},
-            "separation_deg": round(sky["sep_deg"], 2)
+            "sun": {"azimuth": clean_float(round(sky["sun_az"], 2)), "elevation": clean_float(round(sky["sun_el"], 2)), "above_horizon": sky["sun_el"] > h_sun},
+            "earth": {"azimuth": clean_float(round(sky["earth_az"], 2)), "elevation": clean_float(round(sky["earth_el"], 2)), "above_horizon": sky["earth_el"] > h_earth},
+            "separation_deg": clean_float(round(sky["sep_deg"], 2))
         },
         "terrain": {"horizon_mask_at_sun_az": h_sun, "horizon_mask_at_earth_az": h_earth, "terrain_source": t_source},
         "data_quality": {"resolution_m": 5.0, "synthetic": t_source != "lola_dem_synthetic", "engineering_grade": False},
@@ -404,68 +399,67 @@ def get_environment(lat: float = Query(..., ge=-90, le=-80), lon: float = Query(
 
 @app.post("/api/site-evaluation")
 def site_evaluation(req: EvalRequest):
-    results = []
-    for s in req.sites:
-        lon_adj = s.lon if s.lon <= 180 else s.lon - 360
-        slope, rough, psr_eva, psr_isru, snr, n_bad, h, t_source = get_terrain_profile(s.name, s.lat, lon_adj, s.slope_deg, s.roughness_rms, s.psr_distance_km)
-        
-        sim = simulate_mission(s.lat, lon_adj, h, snr, req.start_time_utc, req.duration_days)
-        
-        # EC-07 硬约束
-        ec07_pass = sim["longest_continuous_fully_lit_hours"] >= 156.0
-        
-        # EC-02 软约束
-        ec02_score = 0.0 if n_bad == 360 else 100.0 * (1.0 - n_bad / 360.0)
-        
-        slope_sc = 100.0 if slope <= 5.0 else (100.0 - (slope - 5.0) * 15.0 if slope <= 8.0 else max(0.0, 55.0 - (slope - 8.0) * 20.0))
-        psr_sc = 100.0 if psr_eva <= 2.0 else max(0.0, 100.0 - (psr_eva - 2.0) * 6.0)
-        rough_sc = max(0.0, 100.0 - rough * 40.0)
-        score_safe = 0.55 * slope_sc + 0.25 * psr_sc + 0.20 * rough_sc
-        
-        tot_sc = 0.40 * score_safe + 0.30 * sim["power_pct"] + 0.30 * sim["comm_pct"]
-        
-        if slope > 10.0:
-            assess, tot_sc = "No-Go (EC-03 Fail)", 0.0
-        elif not ec07_pass:
-            assess, tot_sc = "No-Go (EC-07 Fail)", 0.0
-        elif tot_sc >= 80.0: assess = "Excellent"
-        elif tot_sc >= 62.0: assess = "Good"
-        elif tot_sc >= 42.0: assess = "Challenging"
-        else: assess = "No-Go"
+    try:
+        results = []
+        for s in req.sites:
+            lon_adj = s.lon if s.lon <= 180 else s.lon - 360
+            slope, rough, psr_eva, psr_isru, snr, n_bad, h, t_source = get_terrain_profile(s.name, s.lat, lon_adj, s.slope_deg, s.roughness_rms, s.psr_distance_km)
+            
+            sim = simulate_mission(s.lat, lon_adj, h, snr, req.start_time_utc, req.duration_days)
+            
+            ec07_pass = sim["longest_continuous_fully_lit_hours"] >= 156.0
+            ec02_score = 0.0 if n_bad == 360 else 100.0 * (1.0 - n_bad / 360.0)
+            
+            slope_sc = 100.0 if slope <= 5.0 else (100.0 - (slope - 5.0) * 15.0 if slope <= 8.0 else max(0.0, 55.0 - (slope - 8.0) * 20.0))
+            psr_sc = 100.0 if psr_eva <= 2.0 else max(0.0, 100.0 - (psr_eva - 2.0) * 6.0)
+            rough_sc = max(0.0, 100.0 - rough * 40.0)
+            score_safe = 0.55 * slope_sc + 0.25 * psr_sc + 0.20 * rough_sc
+            
+            tot_sc = 0.40 * score_safe + 0.30 * sim["power_pct"] + 0.30 * sim["comm_pct"]
+            
+            if slope > 10.0:
+                assess, tot_sc = "No-Go (EC-03 Fail)", 0.0
+            elif not ec07_pass:
+                assess, tot_sc = "No-Go (EC-07 Fail)", 0.0
+            elif tot_sc >= 80.0: assess = "Excellent"
+            elif tot_sc >= 62.0: assess = "Good"
+            elif tot_sc >= 42.0: assess = "Challenging"
+            else: assess = "No-Go"
 
-        results.append({
-            "site_info": {"name": s.name, "lat": s.lat, "lon": lon_adj, "terrain_source": t_source},
-            "engineering_constraints": {
-                "EC-01": {"value": slope, "threshold": 8.0, "pass": slope <= 8.0, "severity": "hard"},
-                "EC-02": {"value": n_bad, "n_bad_azimuths": n_bad, "score": round(ec02_score, 1), "pass": n_bad < 360, "severity": "soft"},
-                "EC-03": {"value": slope, "threshold": 10.0, "pass": slope <= 10.0, "severity": "hard"},
-                "EC-04": {"status": "not_available", "reason": "LOLA 5m DEM resolution insufficient for 2m obstacle detection"},
-                "EC-05": {"value": psr_eva, "threshold": 1.38, "pass": psr_eva <= 1.38, "severity": "soft"},
-                "EC-06": {"value": psr_isru, "threshold": 10.0, "pass": psr_isru <= 10.0, "severity": "soft"},
-                "EC-07": {"longest_continuous_fully_lit_hours": round(sim["longest_continuous_fully_lit_hours"], 1), "threshold_hours": 156.0, "pass": ec07_pass, "severity": "hard"},
-                "EC-08": {"visible_pct": round(sim["visible_pct"], 1), "partial_pct": round(sim["partial_pct"], 1), "occulted_pct": round(sim["occulted_pct"], 1), "pass": sim["comm_pct"] >= 50.0, "severity": "soft"}
-            },
-            "horizon_profile": [{"azimuth": i, "elevation": round(float(h[i]), 2)} for i in range(360)],
-            "timeline": sim["timeline"],
-            "hourly_telemetry": sim["hourly_telemetry"],
-            "earth_occultation_events": sim["earth_occultation_events"],
-            "summary": {
-                "score": round(tot_sc, 1), "safeness_score": round(score_safe, 1), "assessment": assess,
-                "power_pct": round(sim["power_pct"], 1), "comm_pct": round(sim["comm_pct"], 1),
-                "longest_continuous_fully_lit_hours": round(sim["longest_continuous_fully_lit_hours"], 1),
-                "max_illumination_interruption_hours": round(sim["max_dark_hours"], 1),
-                "q_comm_index": round(sim["comm_pct"], 1),
-                "snr_db_p50": 18.5, "rssi_dbm_p50": -132.5 # 静态模拟
-            },
-            "data_provenance": {
-                "slope": {"dataset": "LOLA 5m DEM", "algorithm": "Horn 3x3"},
-                "horizon": {"dataset": "LOLA 5m DEM", "resolution_m": 5.0},
-                "q_comm": {"assumptions": {"frequency_band": "X", "ground_station": "Goldstone", "multipath_modeled": false}}
-            }
-        })
-    return {"status": "success", "api_version": "1.0.0", "results": results}
+            results.append({
+                "site_info": {"name": s.name, "lat": s.lat, "lon": lon_adj, "terrain_source": t_source},
+                "engineering_constraints": {
+                    "EC-01": {"value": slope, "threshold": 8.0, "pass": slope <= 8.0, "severity": "hard"},
+                    "EC-02": {"value": n_bad, "n_bad_azimuths": n_bad, "score": round(ec02_score, 1), "pass": n_bad < 360, "severity": "soft"},
+                    "EC-03": {"value": slope, "threshold": 10.0, "pass": slope <= 10.0, "severity": "hard"},
+                    "EC-04": {"status": "not_available", "reason": "LOLA 5m DEM resolution insufficient for 2m obstacle detection"},
+                    "EC-05": {"value": psr_eva, "threshold": 1.38, "pass": psr_eva <= 1.38, "severity": "soft"},
+                    "EC-06": {"value": psr_isru, "threshold": 10.0, "pass": psr_isru <= 10.0, "severity": "soft"},
+                    "EC-07": {"longest_continuous_fully_lit_hours": round(sim["longest_continuous_fully_lit_hours"], 1), "threshold_hours": 156.0, "pass": ec07_pass, "severity": "hard"},
+                    "EC-08": {"visible_pct": round(sim["visible_pct"], 1), "partial_pct": round(sim["partial_pct"], 1), "occulted_pct": round(sim["occulted_pct"], 1), "pass": sim["comm_pct"] >= 50.0, "severity": "soft"}
+                },
+                "horizon_profile": [{"azimuth": i, "elevation": round(float(h[i]), 2)} for i in range(360)],
+                "timeline": sim["timeline"],
+                "hourly_telemetry": sim["hourly_telemetry"],
+                "earth_occultation_events": sim["earth_occultation_events"],
+                "summary": {
+                    "score": round(tot_sc, 1), "safeness_score": round(score_safe, 1), "assessment": assess,
+                    "power_pct": round(sim["power_pct"], 1), "comm_pct": round(sim["comm_pct"], 1),
+                    "longest_continuous_fully_lit_hours": round(sim["longest_continuous_fully_lit_hours"], 1),
+                    "max_illumination_interruption_hours": round(sim["max_dark_hours"], 1),
+                    "q_comm_index": round(sim["comm_pct"], 1),
+                    "snr_db_p50": 18.5, "rssi_dbm_p50": -132.5
+                },
+                "data_provenance": {
+                    "slope": {"dataset": "LOLA 5m DEM", "algorithm": "Horn 3x3"},
+                    "horizon": {"dataset": "LOLA 5m DEM", "resolution_m": 5.0},
+                    "q_comm": {"assumptions": {"frequency_band": "X", "ground_station": "Goldstone", "multipath_modeled": false}}
+                }
+            })
+        return {"status": "success", "api_version": "1.0.0", "results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error": str(e), "trace": traceback.format_exc()})
 
 @app.get("/api/timeslices")
 def timeslices(site_id: str = "de Gerlache Rim 2", tw_id: str = "TW-1", step_hours: int = 1):
-    # 简化实现，直接返回基于默认参数的模拟序列
     return {"site_id": site_id, "tw_id": tw_id, "resolution_hours": step_hours, "slices": []}
