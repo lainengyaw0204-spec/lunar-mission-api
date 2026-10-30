@@ -413,10 +413,8 @@ def site_evaluation(req: EvalRequest):
     try:
         results = []
         for s in req.sites:
-            # 生成缓存的唯一 Key
             cache_key = f"{s.name}_{req.start_time_utc}_{req.duration_days}"
             
-            # 如果命中缓存，直接拿数据，跳过计算！(这就是秒回的原因)
             if cache_key in SCENARIO_CACHE:
                 results.append(SCENARIO_CACHE[cache_key])
                 continue
