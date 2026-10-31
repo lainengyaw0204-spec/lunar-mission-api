@@ -1,0 +1,2519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUNAR MISSION BROWSER · 3D Cockpit v10 Final Release</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: #050914; color: #cbd5e1;
+    font-family: ui-monospace, 'JetBrains Mono', 'Fira Code', SFMono-Regular, Menlo, Consolas, monospace;
+    overflow: hidden; height: 100vh;
+  }
+  .glass { background: rgba(11, 18, 34, 0.80); backdrop-filter: blur(14px); border: 1px solid rgba(34, 211, 238, 0.16); border-radius: 10px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .panel-title { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #22d3ee; font-weight: 700; margin-bottom: 6px; }
+
+  .site-btn { font-size: 12px; padding: 8px 10px; transition: all 0.15s; border: 1px solid rgba(51,65,85,0.8); background: rgba(15,23,42,0.55); cursor: pointer; text-align: left; border-radius: 6px; width: 100%; }
+  .site-btn:hover { border-color: rgba(34,211,238,0.45); }
+  .site-btn.active { border-color: #22d3ee; background: rgba(34,211,238,0.12); box-shadow: 0 0 12px rgba(34,211,238,0.22); }
+  .tw-btn { font-size: 12px; padding: 6px 8px; transition: all 0.15s; border: 1px solid #334155; background: rgba(15,23,42,0.45); cursor: pointer; border-radius: 6px; }
+  .tw-btn.active { border-color: #22d3ee; background: rgba(34,211,238,0.16); color: #67e8f9; }
+  .view-btn { transition: all 0.15s; font-size: 10px; padding: 3px 9px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+  .view-btn.on { background: rgba(34,211,238,0.22); border: 1px solid #22d3ee; color: #67e8f9; }
+  .view-btn.off { background: rgba(15,23,42,0.8); border: 1px solid #334155; color: #94a3b8; }
+
+  input[type=text], input[type=number] { font-size: 12px !important; padding: 5px 8px !important; }
+  input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #22d3ee; border: 2px solid #fff; box-shadow: 0 0 10px #22d3ee; }
+
+  .scroll-y { overflow-y: auto; }
+  .scroll-y::-webkit-scrollbar { width: 5px; }
+  .scroll-y::-webkit-scrollbar-thumb { background: rgba(34,211,238,0.25); border-radius: 3px; }
+
+  .view { display: none; }
+  body.mode-planner #viewPlanner { display: grid; }
+  body.mode-educator #viewEducator { display: grid; }
+  body.mode-public #viewPublic { display: flex; }
+
+  .m-planner-flex, .m-educator-flex, .m-public-flex { display: none; }
+  body.mode-planner .m-planner-flex { display: flex; }
+  body.mode-educator .m-educator-flex { display: flex; }
+  body.mode-public .m-public-flex { display: flex; }
+
+  .mode-btn { transition: all 0.2s; border: 1px solid rgba(34,211,238,0.2); background: rgba(15,23,42,0.6); color: #94a3b8; font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 6px; cursor: pointer; letter-spacing: 0.06em; }
+  .mode-btn:hover { border-color: rgba(34,211,238,0.5); color: #cbd5e1; }
+  body.mode-planner #btn-mode-planner, body.mode-educator #btn-mode-educator, body.mode-public #btn-mode-public { background: rgba(34,211,238,0.18); border-color: #22d3ee; color: #67e8f9; box-shadow: 0 0 12px rgba(34,211,238,0.3); }
+
+  #viewPlanner { grid-template-columns: 255px 1fr 410px; gap: 10px; padding: 10px; height: calc(100vh - 56px - 76px); }
+  #viewPlanner .center-stack { display: grid; grid-template-rows: 46% 54%; gap: 10px; min-width: 0; min-height: 0; }
+
+  #viewEducator { grid-template-columns: 230px 1fr 390px; gap: 10px; padding: 10px; height: calc(100vh - 56px - 76px); }
+  #viewEducator .center-stack { display: flex; min-width: 0; min-height: 0; }
+
+  #viewPublic { flex-direction: column; height: calc(100vh - 56px - 76px); background: #000; }
+  #viewPublic .pov-full { flex: 1; position: relative; min-height: 0; }
+
+  .gantt-bar { display: flex; height: 100%; border-radius: 4px; overflow: hidden; background: #0a101d; }
+  .gantt-seg { height: 100%; }
+
+  .big-play { padding: 14px 40px; font-size: 15px; font-weight: 700; letter-spacing: 0.14em; color: #000; background: linear-gradient(135deg,#22d3ee,#06b6d4); border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 0 30px rgba(34,211,238,0.45); transition: all 0.2s; }
+  .big-play:hover { box-shadow: 0 0 50px rgba(34,211,238,0.7); transform: scale(1.02); }
+
+  .score-circle { width: 150px; height: 150px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 30%, rgba(34,211,238,0.15), rgba(5,9,20,0.92)); border: 2px solid #22d3ee; box-shadow: 0 0 32px rgba(34,211,238,0.35), inset 0 0 24px rgba(34,211,238,0.1); color: #fff; }
+  .score-circle .val { font-size: 46px; font-weight: 700; line-height: 1; text-shadow: 0 0 20px currentColor; }
+  .score-circle .lbl { font-size: 10px; letter-spacing: 0.2em; color: rgba(255,255,255,0.75); margin-top: 4px; }
+  .score-circle.power { border-color: #facc15; }
+  .score-circle.power .val { color: #fde047; }
+  .score-circle.comm { border-color: #06b6d4; }
+  .score-circle.comm .val { color: #22d3ee; }
+  .score-circle.safe { border-color: #a855f7; }
+  .score-circle.safe .val { color: #c084fc; }
+
+  .eclipse-callout { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(88,28,135,0.88); backdrop-filter: blur(18px); border: 2px solid #a855f7; border-radius: 14px; padding: 20px 28px; text-align: center; box-shadow: 0 0 50px rgba(168,85,247,0.65); z-index: 20; }
+  .pulse-red { animation: pulseRed 1.2s infinite; }
+  @keyframes pulseRed { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+  .number-glow { text-shadow: 0 0 12px currentColor; }
+
+  header.site-header { height: 56px; }
+  footer.footer-bar { height: 76px; }
+
+  .split-divider { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 2px; background: linear-gradient(to bottom, transparent, #22d3ee, transparent); pointer-events: none; z-index: 10; box-shadow: 0 0 12px #22d3ee; }
+  .split-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(10,16,29,0.92); color: #d8b4fe; font-size: 10px; font-weight: bold; padding: 4px 12px; border-radius: 20px; border: 1px solid #a855f7; pointer-events: none; z-index: 11; box-shadow: 0 0 15px rgba(168,85,247,0.5); letter-spacing: 0.14em; }
+
+  /* ============================================================================
+     MODULE C — Planner footer expands for 30-day telemetry
+     ============================================================================ */
+  footer.footer-bar {
+    transition: height 0.25s ease;
+    min-height: 76px;
+  }
+  body.mode-planner footer.footer-bar { height: 230px; }
+  body.mode-educator footer.footer-bar,
+  body.mode-public footer.footer-bar { height: 76px; }
+
+  body.mode-planner #viewPlanner {
+    height: calc(100vh - 56px - 230px);
+  }
+  body.mode-educator #viewEducator,
+  body.mode-public #viewPublic {
+    height: calc(100vh - 56px - 76px);
+  }
+
+  #telemetryCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 80px;
+  }
+  #ganttContainer { pointer-events: none; }
+  #globalTimeSlider { z-index: 20; }
+
+  /* ============================================================================
+     MODULE E — Public & Educator polish
+     ============================================================================ */
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 32px rgba(34,211,238,0.35), inset 0 0 24px rgba(34,211,238,0.1); }
+    50%      { transform: scale(1.03); box-shadow: 0 0 48px rgba(34,211,238,0.55), inset 0 0 32px rgba(34,211,238,0.15); }
+  }
+  .score-circle { animation: breathe 3.6s ease-in-out infinite; }
+  .score-circle.power { animation-delay: 0.6s; }
+  .score-circle.comm  { animation-delay: 1.2s; }
+
+  @keyframes storySlide {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .story-card {
+    animation: storySlide 0.5s ease-out;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  /* Educator: 3-step narrative */
+  .edu-step {
+    padding: 8px 10px;
+    border-radius: 6px;
+    border-left: 3px solid;
+    margin-bottom: 6px;
+    background: rgba(15,23,42,0.55);
+  }
+  .edu-step.what  { border-color: #22d3ee; }
+  .edu-step.why   { border-color: #a855f7; }
+  .edu-step.see   { border-color: #facc15; }
+  .edu-step-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    margin-bottom: 3px;
+    text-transform: uppercase;
+  }
+  .edu-step-body {
+    font-size: 12px;
+    color: #cbd5e1;
+    line-height: 1.5;
+  }
+
+  @keyframes pulseSoft {
+    0%, 100% { opacity: 0.85; }
+    50%      { opacity: 1; }
+  }
+  .edu-tip {
+    animation: pulseSoft 2.4s ease-in-out infinite;
+  }
+</style>
+</head>
+<body class="mode-planner">
+
+<!-- HEADER -->
+<header class="site-header border-b border-cyan-500/20 bg-[#080f1c] px-4 flex items-center gap-4">
+  <div class="flex items-center gap-3 shrink-0">
+    <div class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_12px_#22d3ee]"></div>
+    <div>
+      <h1 class="text-sm font-bold tracking-[0.22em] text-cyan-300">LUNAR MISSION BROWSER</h1>
+      <div class="text-[10px] text-slate-400 tracking-widest">3D TERRAIN · SPLIT POV · ECLIPSE PARADOX</div>
+    </div>
+  </div>
+  <div class="flex items-center gap-1.5 mx-auto">
+    <button id="btn-mode-planner" class="mode-btn" onclick="setMode('planner')">🧑‍🚀 MISSION PLANNER</button>
+    <button id="btn-mode-educator" class="mode-btn" onclick="setMode('educator')">🎓 EDUCATOR</button>
+    <button id="btn-mode-public" class="mode-btn" onclick="setMode('public')">🌍 PUBLIC</button>
+  </div>
+  <div class="flex items-center gap-2 text-[11px] shrink-0">
+    <div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900/80 border border-slate-700/70">
+      <span id="apiStatusDot" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+      <span id="apiStatusText" class="text-amber-300 font-bold">LOCAL ENGINE</span>
+      <span class="text-slate-500 text-[9px]" id="apiLatency"></span>
+    </div>
+    <button onclick="connectApi()" title="Probe SPICE Backend" class="px-2 py-1 rounded bg-cyan-500/15 border border-cyan-500/50 text-cyan-300 hover:bg-cyan-500/30 font-bold">↻ API</button>
+    <button onclick="toggleOrbitModal(true)" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400/60 text-purple-200 hover:bg-purple-500/35 font-bold">🌌 3D ORBIT</button>
+  </div>
+</header>
+
+<!-- PLANNER VIEW -->
+<div id="viewPlanner" class="view">
+
+  <aside class="glass p-3 flex flex-col gap-3 scroll-y" style="min-height:0">
+    <div>
+      <div class="panel-title">◈ CANDIDATE SITES</div>
+      <div id="siteList" class="flex flex-col gap-1.5"></div>
+    </div>
+    <div>
+      <div class="panel-title">◈ SURFACE STAY WINDOW</div>
+      <div id="twListPlanner" class="grid grid-cols-2 gap-1.5"></div>
+    </div>
+    <div>
+      <div class="panel-title">◈ SCENARIO PRESETS</div>
+      <div class="flex flex-col gap-1.5">
+        <button onclick="selectPresetCase('good_both')" class="text-left px-2.5 py-1.5 rounded border border-emerald-500/35 bg-emerald-500/10 text-emerald-300 text-[11px] hover:bg-emerald-500/20 font-semibold">🟢 BEST: Sun + Comm (Malapert)</button>
+        <button onclick="selectPresetCase('eclipse_case')" class="text-left px-2.5 py-1.5 rounded border border-purple-500/50 bg-purple-500/15 text-purple-200 text-[11px] hover:bg-purple-500/25 font-semibold">🟣 ECLIPSE PARADOX (Gerlache)</button>
+        <button onclick="selectPresetCase('bad_both')" class="text-left px-2.5 py-1.5 rounded border border-red-500/35 bg-red-500/10 text-red-300 text-[11px] hover:bg-red-500/20 font-semibold">🔴 HIGH RISK: Crater Rim (Shackleton)</button>
+      </div>
+    </div>
+    <div>
+      <div class="panel-title">◈ PIN CUSTOM SITE</div>
+      <div class="flex flex-col gap-1.5">
+        <input id="customName" type="text" placeholder="Site Name (e.g. Artemis IV)" class="bg-slate-950 border border-slate-700 rounded text-white">
+        <div class="grid grid-cols-2 gap-1.5">
+          <input id="customLat" type="number" step="0.01" min="-90" max="-80" value="-87.5" class="bg-slate-950 border border-slate-700 rounded text-white" title="Latitude (°S)">
+          <input id="customLon" type="number" step="0.1" min="-180" max="180" value="42.0" class="bg-slate-950 border border-slate-700 rounded text-white" title="Longitude (°E)">
+        </div>
+        <button onclick="addCustomSite()" class="py-1.5 rounded bg-cyan-500/20 border border-cyan-400 text-cyan-200 text-[11px] font-bold hover:bg-cyan-500/35">+ PIN TO 2D &amp; 3D</button>
+        <div id="customWarn" class="hidden text-[10px] text-amber-300 mono leading-tight"></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="center-stack" style="min-height:0">
+    <div class="glass p-2.5 flex flex-col" style="min-height:0">
+      <div class="flex items-center justify-between mb-1.5">
+        <div class="flex items-center gap-2">
+          <span class="panel-title" style="margin-bottom:0">◈ LUNAR SOUTH POLE TERRAIN &amp; VECTORS</span>
+          <span id="terrainSubNote" class="text-[10px] text-slate-400 mono">Drag 3D bowl to rotate · Yellow ray = Sun · Cyan ray = Earth</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <button id="btnMoon3D" class="view-btn on" onclick="setMoonView('3d')">3D CRATER BOWL</button>
+          <button id="btnMoon2D" class="view-btn off" onclick="setMoonView('2d')">2D SOUTH POLE MAP</button>
+        </div>
+      </div>
+      <div class="flex-1 relative rounded-lg overflow-hidden bg-[#03060f] border border-slate-800/80" style="min-height:0">
+        <div id="moon3DContainer" class="absolute inset-0"></div>
+        <canvas id="moon2DCanvas" class="w-full h-full hidden"></canvas>
+      </div>
+    </div>
+
+    <div class="glass relative overflow-hidden" style="min-height:0; padding:0;">
+      <div class="grid grid-cols-2 h-full w-full">
+        <div class="relative flex flex-col h-full border-r border-cyan-500/30">
+          <div class="absolute top-2.5 left-2.5 z-10 flex items-center gap-2 bg-slate-950/85 px-2.5 py-1 rounded border border-yellow-500/50">
+            <span class="text-[11px] font-bold text-yellow-300">☀️ SUN CAMERA (POWER)</span>
+            <span id="povSunStatus" class="text-[10px] mono text-emerald-300">CLEAR</span>
+          </div>
+          <canvas id="povSun" class="w-full h-full bg-black block"></canvas>
+        </div>
+        <div class="relative flex flex-col h-full">
+          <div class="absolute top-2.5 right-2.5 z-10 flex items-center gap-2 bg-slate-950/85 px-2.5 py-1 rounded border border-cyan-500/50">
+            <span class="text-[11px] font-bold text-cyan-300">🌍 EARTH CAMERA (DTE COMM)</span>
+            <span id="povEarthStatus" class="text-[10px] mono text-cyan-200">LINK OK</span>
+          </div>
+          <canvas id="povEarth" class="w-full h-full bg-black block"></canvas>
+        </div>
+      </div>
+      <div class="split-divider"></div>
+      <div id="paradoxLabel" class="split-label">DUAL LOCK-ON POV</div>
+    </div>
+
+  </div>
+
+  <aside class="glass p-3 flex flex-col gap-2.5 scroll-y" style="min-height:0">
+
+    <div class="border border-cyan-500/20 rounded-lg p-2.5 bg-slate-950/60">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-[9px] uppercase tracking-widest text-slate-500">COMPOSITE DECISION SCORE</div>
+          <div id="scoreName" class="text-[13px] font-bold text-slate-100 mt-0.5"></div>
+          <div id="scoreCoords" class="text-[10px] mono text-slate-400"></div>
+        </div>
+        <div id="scoreBadge" class="px-2 py-0.5 rounded text-[10px] font-bold mono border"></div>
+      </div>
+      <div class="flex items-baseline gap-2 mt-1">
+        <div id="scoreTotal" class="text-3xl font-bold mono leading-none">—</div>
+        <div class="text-[10px] text-slate-500 leading-tight">/ 100 · <span id="scoreAssess" class="text-cyan-400 font-bold"></span></div>
+      </div>
+
+      <!-- ==================== MODULE B: EC GATE PANEL ==================== -->
+      <div id="ecGatePanel" class="mt-2 pt-2 border-t border-slate-700/60">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[9px] uppercase tracking-widest text-slate-500">ENGINEERING CONSTRAINTS</span>
+          <span id="ecGateSummary" class="text-[9px] mono font-bold text-slate-500">—</span>
+        </div>
+        <div id="ecGateList" class="grid grid-cols-2 gap-1 text-[9px] mono"></div>
+      </div>
+    </div>
+
+    <div class="space-y-1.5">
+      <div>
+        <div class="flex items-baseline justify-between text-[10px] mb-0.5"><span class="font-bold text-purple-300">SAFENESS (Slope &amp; PSR)</span><span id="dimSafe" class="mono text-slate-300">—</span></div>
+        <div class="h-1.5 bg-slate-800 rounded overflow-hidden"><div id="barSafe" class="h-full bg-purple-400 transition-all" style="width:0%"></div></div>
+      </div>
+      <div>
+        <div class="flex items-baseline justify-between text-[10px] mb-0.5"><span class="font-bold text-yellow-300">POWER POTENTIAL</span><span id="dimPower" class="mono text-slate-300">—</span></div>
+        <div class="h-1.5 bg-slate-800 rounded overflow-hidden"><div id="barPower" class="h-full bg-yellow-400 transition-all" style="width:0%"></div></div>
+      </div>
+      <div>
+        <div class="flex items-baseline justify-between text-[10px] mb-0.5"><span class="font-bold text-cyan-300">DIRECT-TO-EARTH COMM</span><span id="dimComm" class="mono text-slate-300">—</span></div>
+        <div class="h-1.5 bg-slate-800 rounded overflow-hidden"><div id="barComm" class="h-full bg-cyan-400 transition-all" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-1" style="height: 225px;">
+      <div class="flex items-baseline justify-between">
+        <span class="panel-title" style="margin-bottom:0">◈ 360° HORIZON MASK RADAR</span>
+        <span id="horizonPeakNote" class="text-[10px] text-cyan-400/80 mono">—</span>
+      </div>
+      <div class="flex-1 relative">
+        <canvas id="horizonRadarPlanner" class="w-full h-full"></canvas>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-2 text-[10px]">
+      <div class="border border-slate-700/60 rounded p-1.5 bg-slate-950/50">
+        <div class="text-slate-400 text-[9px]">☀️ SUN VECTOR (ENU)</div>
+        <div id="seSunAz" class="text-yellow-300 mono font-bold">—</div>
+        <div id="seSunEl" class="text-slate-400 mono text-[9px]">—</div>
+      </div>
+      <div class="border border-slate-700/60 rounded p-1.5 bg-slate-950/50">
+        <div class="text-slate-400 text-[9px]">🌍 EARTH VECTOR (ENU)</div>
+        <div id="seEarthAz" class="text-cyan-300 mono font-bold">—</div>
+        <div id="seEarthEl" class="text-slate-400 mono text-[9px]">—</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel-title">◈ 20-SCENARIO MATRIX (CLICK TO JUMP)</div>
+      <div id="matrixPlanner" class="text-[10px]"></div>
+    </div>
+  </aside>
+
+</div>
+
+<!-- EDUCATOR VIEW -->
+<div id="viewEducator" class="view">
+  <aside class="glass p-3 flex flex-col gap-3 scroll-y" style="min-height:0">
+    <div><div class="panel-title">◈ CANDIDATE SITES</div><div id="siteListEdu" class="flex flex-col gap-2"></div></div>
+    <div><div class="panel-title">◈ STAY WINDOW</div><div id="twListEdu" class="grid grid-cols-2 gap-2"></div></div>
+  </aside>
+  <div class="center-stack" style="min-height:0">
+    <div class="glass p-2.5 flex flex-col flex-1 relative" style="min-height:0">
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="panel-title" style="margin-bottom:0">◈ STANDING ON THE LUNAR SOUTH POLE (LOOKING TOWARD EARTH)</span>
+        <span id="povLiveBadgeEdu" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-cyan-300 mono">REAL-TIME GEOMETRY</span>
+      </div>
+      <div class="flex-1 relative rounded overflow-hidden bg-black" style="min-height:0">
+        <canvas id="povEducator" class="w-full h-full"></canvas>
+        <div id="eclipseCalloutEdu" class="eclipse-callout hidden pointer-events-none"></div>
+      </div>
+    </div>
+  </div>
+  <aside class="glass p-3 flex flex-col gap-3 scroll-y" style="min-height:0">
+    <div>
+      <span class="panel-title">◈ 360° LOCAL HORIZON BOWL</span>
+      <div class="aspect-square w-full relative">
+        <canvas id="horizonRadarEducator" class="w-full h-full"></canvas>
+      </div>
+    </div>
+    <div class="border border-cyan-500/25 rounded p-3 bg-slate-950/60">
+      <div class="text-[11px] font-bold text-cyan-300 mb-2 tracking-wider">🧑‍🏫 PHYSICAL INTERPRETATION</div>
+      <div id="eduExplain"></div>
+    </div>
+  </aside>
+</div>
+
+<!-- PUBLIC VIEW -->
+<div id="viewPublic" class="view">
+  <div class="pov-full">
+    <canvas id="povPublic" class="w-full h-full block"></canvas>
+    <div class="absolute top-6 right-6 flex flex-col gap-3 items-center" id="publicDiscs">
+      <div class="score-circle safe"><div class="val" id="pubSafe">—</div><div class="lbl">SAFENESS</div></div>
+      <div class="score-circle power"><div class="val" id="pubPower">—</div><div class="lbl">POWER</div></div>
+      <div class="score-circle comm"><div class="val" id="pubComm">—</div><div class="lbl">COMM</div></div>
+    </div>
+    <div class="absolute bottom-6 left-6">
+      <div class="text-3xl font-bold text-white number-glow" id="pubSiteName">—</div>
+      <div class="text-[13px] text-cyan-300 mono mt-1" id="pubSiteCoord">—</div>
+    </div>
+    <!-- MODULE E: Public Story Card -->
+    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 max-w-[720px] w-[calc(100%-3rem)]">
+      <div id="pubStoryCard" class="story-card px-6 py-4 rounded-2xl bg-[#050914]/85 backdrop-blur-md border border-cyan-500/40 text-center">
+        <div id="pubStoryIcon" class="text-3xl mb-1">🌙</div>
+        <div id="pubStoryTitle" class="text-xl font-bold text-white mb-1 tracking-wide">—</div>
+        <div id="pubStoryBody" class="text-[13px] text-slate-300 leading-relaxed">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER TIMELINE -->
+<footer class="footer-bar border-t border-cyan-500/20 bg-[#080f1c] px-4 flex flex-col gap-2 py-2">
+
+  <!-- ROW 1: Controls + Time info -->
+  <div class="flex items-center gap-2 flex-wrap">
+    <div class="m-planner-flex items-center gap-2">
+      <button id="playPauseBtn" onclick="togglePlay()" class="px-3 py-1 rounded bg-cyan-500/20 border border-cyan-400 text-cyan-300 text-[12px] font-bold hover:bg-cyan-500/35">▶ PLAY</button>
+      <button onclick="triggerEclipseMoment()" title="Jump to Solar Eclipse" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px] font-bold hover:bg-purple-500/35">🌑 ECLIPSE</button>
+      <select id="playSpeed" class="bg-slate-900 border border-slate-700 text-cyan-300 text-[11px] rounded px-1.5 py-1 mono">
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1.0×</option>
+        <option value="2">2.0×</option>
+        <option value="4">4.0×</option>
+      </select>
+    </div>
+    <div class="m-educator-flex items-center gap-2">
+      <button id="playPauseBtnEdu" onclick="togglePlay()" class="px-3 py-1 rounded bg-cyan-500/20 border border-cyan-400 text-cyan-300 text-[12px] font-bold hover:bg-cyan-500/35">▶ PLAY</button>
+      <button onclick="triggerEclipseMoment()" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px] font-bold hover:bg-purple-500/35">🌑 JUMP TO ECLIPSE</button>
+    </div>
+    <div class="m-public-flex items-center gap-3 w-full justify-center">
+      <button id="playPauseBtnPub" onclick="togglePlay()" class="big-play">▶ PLAY 30-DAY WINDOW</button>
+      <button onclick="triggerEclipseMoment()" class="px-4 py-2.5 rounded-full bg-purple-600/30 border border-purple-400 text-purple-200 font-bold text-sm">🌑 SEE ECLIPSE</button>
+    </div>
+    <div class="m-planner-flex m-educator-flex flex-1 items-center justify-between text-[11px] mono gap-3 ml-2">
+      <span class="text-slate-400">MISSION TIME <strong id="timeReadout" class="text-cyan-300">T + 216.0 h</strong></span>
+      <span id="dateReadout" class="text-slate-400"></span>
+      <span id="phaseText" class="text-emerald-400 font-bold">🟢 NOMINAL</span>
+      <span id="rangeLabel" class="text-slate-500">0h → 720h</span>
+    </div>
+  </div>
+
+  <!-- ROW 2: Time slider + 30-day Gantt strip (planner + educator) -->
+  <div class="m-planner-flex m-educator-flex relative h-4 w-full">
+    <input id="globalTimeSlider" type="range" min="0" max="720" step="0.25" value="216"
+           class="absolute inset-0 w-full h-4 cursor-pointer" oninput="onTimeScrub(this.value)">
+    <div id="ganttContainer" class="h-4 w-full rounded overflow-hidden bg-slate-900 border border-slate-800">
+      <div class="gantt-bar" id="ganttInner"></div>
+    </div>
+  </div>
+
+  <!-- ROW 3: 30-day telemetry curves (PLANNER ONLY) -->
+  <div class="m-planner-flex flex-col flex-1 min-h-0">
+    <div class="flex items-center justify-between text-[9px] mono mb-1">
+      <span class="text-cyan-400 tracking-widest">◈ MISSION TELEMETRY (30-DAY)</span>
+      <div class="flex items-center gap-3 text-slate-400">
+        <span><span class="inline-block w-3 h-0.5 bg-purple-400 align-middle"></span> Battery SOC %</span>
+        <span><span class="inline-block w-3 border-t border-dashed border-cyan-300 align-middle"></span> SNR dB</span>
+        <span><span class="inline-block w-2 h-2 bg-purple-500/40 align-middle"></span> Earth Occultation</span>
+      </div>
+    </div>
+    <canvas id="telemetryCanvas" class="flex-1 block w-full"></canvas>
+  </div>
+
+</footer>
+
+<!-- 3D SUN-EARTH-MOON ORBIT MODAL -->
+<div id="orbitModal" class="fixed inset-0 z-50" style="display:none;background:rgba(5,9,20,0.92);align-items:center;justify-content:center" onclick="if(event.target.id==='orbitModal')toggleOrbitModal(false)">
+  <div class="glass w-[82vw] h-[82vh] relative overflow-hidden" style="background:rgba(5,9,20,0.98)">
+    <div class="flex items-center justify-between px-4 py-2.5 border-b border-slate-700/60">
+      <div>
+        <div class="text-xs font-bold text-cyan-400 tracking-widest">3D SUN–EARTH–MOON · J2000 INERTIAL SANDBOX</div>
+        <div class="text-[10px] text-slate-400">Drag to rotate · Scroll to zoom · Purple cone = Earth Umbra (Eclipse Shadow Zone)</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="triggerEclipseMoment(); updateOrbitScene();" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px]">🌑 Snap to Eclipse Alignment</button>
+        <button onclick="toggleOrbitModal(false)" class="px-2.5 py-1 rounded bg-slate-800 border border-slate-600 text-slate-300 text-[11px] hover:bg-slate-700">✕ CLOSE</button>
+      </div>
+    </div>
+    <div id="orbitContainer" class="w-full" style="height:calc(100% - 48px);background:#02040a"></div>
+    <div class="absolute bottom-3 left-3 glass px-3 py-2 text-[10px] mono space-y-0.5 pointer-events-none">
+      <div class="text-cyan-400 font-bold tracking-wider">MOON STATUS</div>
+      <div>🌕 Illumination: <span id="moonIllumStatus" class="text-slate-200">NORMAL</span></div>
+      <div>🌑 Umbra Coverage: <span id="moonUmbraPct" class="text-slate-200">0%</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODULE B: GLOBAL LOADING OVERLAY ==================== -->
+<div id="loadingOverlay"
+     class="fixed inset-0 z-[9999] hidden items-center justify-center"
+     style="background: rgba(2, 4, 10, 0.92); backdrop-filter: blur(8px);">
+  <div class="flex flex-col items-center gap-4">
+    <div class="relative w-20 h-20">
+      <div class="absolute inset-0 rounded-full border-4 border-cyan-500/20"></div>
+      <div class="absolute inset-0 rounded-full border-4 border-transparent border-t-cyan-400 border-r-cyan-400 animate-spin"
+           style="animation-duration: 1s;"></div>
+      <div class="absolute inset-3 rounded-full border-2 border-transparent border-b-purple-400 border-l-purple-400 animate-spin"
+           style="animation-duration: 1.6s; animation-direction: reverse;"></div>
+      <div class="absolute inset-0 flex items-center justify-center text-2xl">🌙</div>
+    </div>
+    <div class="text-center">
+      <div class="text-cyan-300 font-bold tracking-[0.2em] text-sm mono">SYNCING WITH LUNAR API</div>
+      <div class="text-slate-500 text-[10px] mono mt-1">30-day telemetry · 360° horizon profile · SPICE ephemeris</div>
+    </div>
+    <div class="text-slate-600 text-[10px] mono" id="loadingElapsed">0.0s</div>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+   1. CONSTANTS & CANDIDATE LANDING SITES
+   ============================================================================ */
+const PHYS = {
+  siderealHours: 655.72, synodicHours: 708.734, anomalisticHours: 661.31, draconicHours: 653.09,
+  yearHours: 365.25 * 24, lunarInclinationDeg: 5.145, moonAxialTiltDeg: 1.5424,
+  earthAngRadDeg: 0.95, sunAngRadDeg: 0.26, earthBaseElevationDeg: 4.2
+};
+
+const SITE_BASE = {
+  gerlache:   { lat: -88.67,   lon: -68.10,  slopeDeg: 1.34, psrDistanceKm: 0.8, obstacleDensity: 'MED',  horizonBase: 1.8, ridgeAz: 145, ridgeHeight: 5.2, snrBase: 16.5, riskLevel: 'low', desc: 'Real slope 1.34° (LOLA 5m DEM). Prime Eclipse Paradox site.' },
+  malapert:   { lat: -85.942,  lon: -0.944,  slopeDeg: 4.20, psrDistanceKm: 0.8, obstacleDensity: 'LOW',  horizonBase: 0.6, ridgeAz: 210, ridgeHeight: 2.2, snrBase: 19.2, riskLevel: 'low', desc: 'Elevated massif peak facing Earth (0°E). ~93% sunlight.' },
+  shackleton: { lat: -89.92,   lon: 120.00,  slopeDeg: 4.23, psrDistanceKm: 0.8, obstacleDensity: 'HIGH', horizonBase: 3.2, ridgeAz: 60,  ridgeHeight: 5.8, snrBase: 14.1, riskLevel: 'med', desc: 'Steep crater rim right at 89.92°S. High terrain shadowing.' },
+  nobile:     { lat: -84.2016, lon: 60.6999, slopeDeg: 7.50, psrDistanceKm: 2.1, obstacleDensity: 'MED',  horizonBase: 2.2, ridgeAz: 220, ridgeHeight: 3.8, snrBase: 14.2, riskLevel: 'med', desc: 'Nobile Rim 2 (VIPER-adjacent). Moderate ridge occultations.' },
+  monsmouton: { lat: -85.111,  lon: 26.71,   slopeDeg: 7.50, psrDistanceKm: 2.1, obstacleDensity: 'LOW',  horizonBase: 0.9, ridgeAz: 180, ridgeHeight: 2.4, snrBase: 18.0, riskLevel: 'med', desc: 'Mons Mouton plateau. Broad visibility with gentle horizon.' }
+};
+const SITE_NAME_MAP = { gerlache: 'de Gerlache Rim 2', malapert: 'Malapert Massif', shackleton: 'Shackleton Rim', nobile: 'Nobile Rim 2', monsmouton: 'Mons Mouton' };
+
+function makeSite(id, name) {
+  return {
+    id,
+    get name() { return name; },
+    get lat() { return SITE_BASE[id].lat; },
+    get lon() { return SITE_BASE[id].lon; },
+    get slopeDeg() { return SITE_BASE[id].slopeDeg; },
+    get psrDistanceKm() { return SITE_BASE[id].psrDistanceKm; },
+    get obstacleDensity() { return SITE_BASE[id].obstacleDensity; },
+    get riskLevel() { return SITE_BASE[id].riskLevel; },
+    get desc() { return SITE_BASE[id].desc; }
+  };
+}
+const SITES = Object.keys(SITE_BASE).map(id => makeSite(id, SITE_NAME_MAP[id] || id));
+
+const TWS = ['TW-1', 'TW-2', 'TW-3', 'TW-4'];
+const TW_DEFS = {
+  'TW-1': { start: '2028-09-27T00:00:00Z', label: '2028-09-27' },
+  'TW-2': { start: '2028-12-21T00:00:00Z', label: '2028-12-21' },
+  'TW-3': { start: '2029-03-20T00:00:00Z', label: '2029-03-20' },
+  'TW-4': { start: '2029-06-15T00:00:00Z', label: '2029-06-15' }
+};
+/* MODULE C: extend to 30 days to match backend duration_days */
+const TW_DURATION = { 'TW-1': 720, 'TW-2': 720, 'TW-3': 720, 'TW-4': 720 };
+const EPOCH = new Date('2028-09-27T00:00:00Z').getTime();
+const TW_T0 = {};
+for (const k in TW_DEFS) TW_T0[k] = (new Date(TW_DEFS[k].start).getTime() - EPOCH) / 3600000;
+
+/* ============================================================================
+   2. THREE-BODY & HORIZON PHYSICS ENGINE
+   ============================================================================ */
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function lunarDistanceKm(t) { return 384400 - 21100 * Math.cos(2 * Math.PI * t / PHYS.anomalisticHours); }
+
+function sunDeclinationDeg(t) {
+  return -PHYS.moonAxialTiltDeg * Math.sin(2 * Math.PI * t / PHYS.yearHours);
+}
+function sunHourAngleDeg(t) { return ((t / PHYS.synodicHours) * 360) % 360 - 180; }
+function sunElevationDeg(lat, t) {
+  const l = lat * Math.PI / 180, d = sunDeclinationDeg(t) * Math.PI / 180, H = sunHourAngleDeg(t) * Math.PI / 180;
+  const s = Math.sin(l) * Math.sin(d) + Math.cos(l) * Math.cos(d) * Math.cos(H);
+  return Math.asin(Math.max(-1, Math.min(1, s))) * 180 / Math.PI;
+}
+function sunAzimuthDeg(lat, lon, t) {
+  const l = lat * Math.PI / 180, d = sunDeclinationDeg(t) * Math.PI / 180;
+  let H = ((sunHourAngleDeg(t) - lon) % 360 + 360) % 360;
+  if (H > 180) H -= 360;
+  H = H * Math.PI / 180;
+  const h = sunElevationDeg(lat, t) * Math.PI / 180, cH = Math.cos(h);
+  if (Math.abs(cH) < 1e-6) return 0;
+  const sA = -Math.sin(H) * Math.cos(d) / cH, cA = (Math.sin(d) - Math.sin(l) * Math.sin(h)) / (Math.cos(l) * cH);
+  return ((Math.atan2(sA, cA) * 180 / Math.PI) % 360 + 360) % 360;
+}
+function earthDecDeg(t) { return 6.7 * Math.sin(2 * Math.PI * t / PHYS.draconicHours); }
+function earthRaDeg(t) { return 7.9 * Math.sin(2 * Math.PI * t / PHYS.anomalisticHours); }
+function earthElevationDeg(lat, lon, t) {
+  const l = lat * Math.PI / 180, d = earthDecDeg(t) * Math.PI / 180, H = (earthRaDeg(t) - lon) * Math.PI / 180;
+  const s = Math.sin(l) * Math.sin(d) + Math.cos(l) * Math.cos(d) * Math.cos(H);
+  return PHYS.earthBaseElevationDeg + Math.asin(Math.max(-1, Math.min(1, s))) * 180 / Math.PI;
+}
+function earthAzimuthDeg(lat, lon, t) {
+  const l = lat * Math.PI / 180, d = earthDecDeg(t) * Math.PI / 180, H = (earthRaDeg(t) - lon) * Math.PI / 180;
+  const h = (earthElevationDeg(lat, lon, t) - PHYS.earthBaseElevationDeg) * Math.PI / 180, cH = Math.cos(h);
+  if (Math.abs(cH) < 1e-6) return 0;
+  const sA = -Math.sin(H) * Math.cos(d) / cH, cA = (Math.sin(d) - Math.sin(l) * Math.sin(h)) / (Math.cos(l) * cH);
+  return ((Math.atan2(sA, cA) * 180 / Math.PI) % 360 + 360) % 360;
+}
+function angularSep(az1, el1, az2, el2) {
+  const a1 = az1 * Math.PI / 180, e1 = el1 * Math.PI / 180, a2 = az2 * Math.PI / 180, e2 = el2 * Math.PI / 180;
+  const c = Math.sin(e1) * Math.sin(e2) + Math.cos(e1) * Math.cos(e2) * Math.cos(a1 - a2);
+  return Math.acos(Math.max(-1, Math.min(1, c))) * 180 / Math.PI;
+}
+function partialEclipseFrac(sep, Re, Rs) {
+  if (sep >= Re + Rs) return 1;
+  if (sep <= Math.abs(Re - Rs)) return Re >= Rs ? 0 : 1 - Math.pow(Re / Rs, 2);
+  const A = Math.acos((sep * sep + Rs * Rs - Re * Re) / (2 * sep * Rs));
+  const B = Math.acos((sep * sep + Re * Re - Rs * Rs) / (2 * sep * Re));
+  const ov = Rs * Rs * (A - Math.sin(2 * A) / 2) + Re * Re * (B - Math.sin(2 * B) / 2);
+  return 1 - ov / (Math.PI * Rs * Rs);
+}
+
+function horizonAt(siteId, azDeg) {
+  const apiH = apiHorizonAt(siteId, azDeg);
+  if (apiH !== null) return apiH;
+  const b = SITE_BASE[siteId] || SITE_BASE.malapert;
+  const az = ((azDeg % 360) + 360) % 360;
+  const rad = az * Math.PI / 180;
+  const seed = Math.abs(Math.round((b.lat || -85) * 7 + (b.lon || 0) * 3)) % 17;
+
+  let h = b.horizonBase
+    + 1.25 * Math.sin(rad * 3 + seed)
+    + 0.85 * Math.sin(rad * 7 + seed * 1.7)
+    + 0.55 * Math.cos(rad * 13 + seed * 2.3)
+    + 0.30 * Math.sin(rad * 23 + seed * 3.1);
+
+  const diff1 = Math.abs(((az - b.ridgeAz + 540) % 360) - 180);
+  h += b.ridgeHeight * Math.exp(-(diff1 * diff1) / (2 * 20 * 20));
+
+  const diff2 = Math.abs(((az - (b.ridgeAz + 115) + 540) % 360) - 180);
+  h += (b.ridgeHeight * 0.65) * Math.exp(-(diff2 * diff2) / (2 * 14 * 14));
+
+  return Math.max(-1.5, h);
+}
+
+function computeQComm(site, earthEl, maskAtEarth) {
+  if (earthEl <= maskAtEarth) return 0;
+  const f = Math.min(1, (earthEl - maskAtEarth) / 8);
+  return Math.max(0, Math.min(100, ((SITE_BASE[site.id]?.snrBase || 15) * f) / 20 * 100));
+}
+
+function computeSkyState(site, twId, tLocal) {
+  const t = (TW_T0[twId] || 0) + tLocal;
+  const sunEl = sunElevationDeg(site.lat, t), sunAz = sunAzimuthDeg(site.lat, site.lon, t);
+  const earthEl = earthElevationDeg(site.lat, site.lon, t), earthAz = earthAzimuthDeg(site.lat, site.lon, t);
+  const maskAtSun = horizonAt(site.id, sunAz), maskAtEarth = horizonAt(site.id, earthAz);
+  const sunOK = sunEl > maskAtSun, earthOK = earthEl > maskAtEarth;
+  const sep = angularSep(sunAz, sunEl, earthAz, earthEl);
+  const isEclipse = earthOK && sep < PHYS.earthAngRadDeg + PHYS.sunAngRadDeg;
+  let sunFactor;
+  if (!sunOK) sunFactor = 0;
+  else if (isEclipse) sunFactor = partialEclipseFrac(sep, PHYS.earthAngRadDeg, PHYS.sunAngRadDeg);
+  else sunFactor = 1;
+  const commActive = earthOK;
+  const qComm = commActive ? computeQComm(site, earthEl, maskAtEarth) : 0;
+  return { sunEl, sunAz, earthEl, earthAz, maskAtSun, maskAtEarth, sunOK, earthOK, isEclipse, sep, sunFactor, commActive, qComm, lunarDistKm: lunarDistanceKm(t) };
+}
+
+/* ============================================================================
+   MODULE A — Render API Integration (v6.0)
+   Endpoint: POST /api/site-evaluation
+   ============================================================================ */
+
+const API = {
+  base: 'https://lunar-mission-browser-api.onrender.com',
+  path: '/api/site-evaluation',
+  live: false,
+  cache: {},            // key: `${siteId}-${twId}` → full response
+  horizonCache: {},     // key: siteId → Float32Array(360)
+  lastLatencyMs: 0
+};
+
+const TW_START_UTC = {
+  'TW-1': '2028-09-27T00:00:00Z',
+  'TW-2': '2028-12-21T00:00:00Z',
+  'TW-3': '2029-03-20T00:00:00Z',
+  'TW-4': '2029-06-15T00:00:00Z'
+};
+const TW_DURATION_DAYS = { 'TW-1': 30, 'TW-2': 30, 'TW-3': 30, 'TW-4': 30 };
+const SITE_API_KEY = {
+  gerlache: 'Gerlache',
+  malapert: 'Malapert',
+  shackleton: 'Shackleton',
+  nobile: 'Nobile',
+  monsmouton: 'Mouton'
+};
+
+async function apiPost(twId) {
+  const sites = SITES.map(s => ({
+    name: SITE_API_KEY[s.id] || s.id,
+    lat: s.lat,
+    lon: s.lon
+  }));
+  const body = {
+    sites,
+    start_time_utc: TW_START_UTC[twId],
+    duration_days: TW_DURATION_DAYS[twId]
+  };
+  const t0 = performance.now();
+  const resp = await fetch(API.base + API.path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(12000)
+  });
+  const ct = resp.headers.get('content-type') || '';
+  if (!ct.includes('json')) throw new Error('NON_JSON HTTP ' + resp.status);
+  const data = await resp.json();
+  API.lastLatencyMs = Math.round(performance.now() - t0);
+  if (!data || !data.results || !Array.isArray(data.results))
+    throw new Error('INVALID_RESPONSE_SHAPE');
+  return data;
+}
+
+async function connectApi() {
+  setApiStatus('probing');
+  showLoading();                    // ← MODULE B
+  try {
+    const data = await apiPost('TW-1');
+    ingestApiResults(data.results, 'TW-1');
+    API.live = true;
+    setApiStatus('live');
+    hideLoading();                  // ← MODULE B
+    // 后台预取其余 TW，不阻塞首屏
+    ['TW-2', 'TW-3', 'TW-4'].forEach(tw => prefetchTw(tw));
+    updateUI();
+  } catch (e) {
+    console.warn('API connect failed:', e);
+    API.live = false;
+    setApiStatus('offline');
+    hideLoading();                  // ← MODULE B
+    updateUI();
+  }
+}
+
+async function prefetchTw(twId) {
+  try {
+    const data = await apiPost(twId);
+    ingestApiResults(data.results, twId);
+    if (state.activeTW === twId && API.live) updateUI();
+  } catch (e) {
+    console.warn('prefetch ' + twId + ' failed:', e);
+  }
+}
+
+function ingestApiResults(results, twId) {
+  results.forEach(r => {
+    const id = SITES.find(s => r.site_info && r.site_info.name.includes(SITE_API_KEY[s.id]))?.id;
+    if (!id) return;
+    API.cache[`${id}-${twId}`] = r;
+
+    // horizon_profile → 360 点 Float32Array，供 horizonAt() 使用
+    if (r.horizon_profile && !API.horizonCache[id]) {
+      const arr = new Float32Array(360);
+      r.horizon_profile.forEach(p => {
+        const i = ((Math.round(p.azimuth) % 360) + 360) % 360;
+        arr[i] = p.elevation;
+      });
+      API.horizonCache[id] = arr;
+    }
+  });
+  // 强制矩阵重绘（模块 A：hash 加入 API 版本）
+  lastMatrixHash = '';
+  lastBuilt3DSiteId = '';
+}
+
+function setApiStatus(s) {
+  const dot = document.getElementById('apiStatusDot');
+  const txt = document.getElementById('apiStatusText');
+  const lat = document.getElementById('apiLatency');
+  if (!dot) return;
+  if (s === 'live') {
+    dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]';
+    txt.textContent = 'SPICE LIVE';
+    txt.className = 'text-emerald-300 font-bold';
+    if (lat) lat.textContent = API.lastLatencyMs + 'ms';
+  } else if (s === 'probing') {
+    dot.className = 'w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse';
+    txt.textContent = 'PROBING';
+    txt.className = 'text-cyan-300';
+    if (lat) lat.textContent = '';
+  } else {
+    dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-400';
+    txt.textContent = 'LOCAL ENGINE';
+    txt.className = 'text-amber-300 font-bold';
+    if (lat) lat.textContent = '';
+  }
+}
+
+function getApiResult(siteId, twId) {
+  return API.live ? API.cache[`${siteId}-${twId}`] : null;
+}
+
+function apiHorizonAt(siteId, azDeg) {
+  const arr = API.horizonCache[siteId];
+  if (!arr) return null;
+  return arr[((Math.round(azDeg) % 360) + 360) % 360];
+}
+
+/* ============================================================================
+   MODULE B — Loading Overlay Control
+   ============================================================================ */
+let loadingTimer = null;
+let loadingStart = 0;
+
+function showLoading() {
+  const el = document.getElementById('loadingOverlay');
+  if (!el) return;
+  el.classList.remove('hidden');
+  el.classList.add('flex');
+  loadingStart = performance.now();
+  const elapsed = document.getElementById('loadingElapsed');
+  if (elapsed) elapsed.textContent = '0.0s';
+  if (loadingTimer) clearInterval(loadingTimer);
+  loadingTimer = setInterval(() => {
+    const s = ((performance.now() - loadingStart) / 1000).toFixed(1);
+    if (elapsed) elapsed.textContent = s + 's';
+  }, 100);
+}
+
+function hideLoading() {
+  const el = document.getElementById('loadingOverlay');
+  if (!el) return;
+  if (loadingTimer) { clearInterval(loadingTimer); loadingTimer = null; }
+  el.classList.add('hidden');
+  el.classList.remove('flex');
+}
+
+/* ============================================================================
+   MODULE B — EC Gate Panel Rendering
+   ============================================================================ */
+const EC_LABELS = {
+  'EC-01': 'Slope ≤ 8°',
+  'EC-02': 'Azimuthal Slope',
+  'EC-03': 'Roughness RMS',
+  'EC-04': 'PSR Distance',
+  'EC-05': 'EVA Reach',
+  'EC-06': 'Boulder Density',
+  'EC-07': 'Continuous Sun ≥ 6.5 d',
+  'EC-08': 'Earth Visibility'
+};
+
+function renderEcPanel() {
+  const list = document.getElementById('ecGateList');
+  const summary = document.getElementById('ecGateSummary');
+  if (!list || !summary) return;
+
+  const api = getApiResult(getSite().id, state.activeTW);
+
+  // API 离线 → 显示占位
+  if (!api) {
+    list.innerHTML = '<div class="col-span-2 text-center text-slate-600 py-1">Local engine · API offline</div>';
+    summary.textContent = '—';
+    summary.className = 'text-[9px] mono font-bold text-slate-500';
+    return;
+  }
+
+  const ec = api.engineering_constraints || {};
+  const entries = Object.keys(EC_LABELS).map(key => {
+    let raw = ec[key];
+    if (key === 'EC-07' && raw === undefined) raw = ec['EC-07_illum'];
+    let pass = null;
+    if (typeof raw === 'boolean') pass = raw;
+    else if (raw && typeof raw === 'object') pass = raw.pass;
+    return { key, label: EC_LABELS[key], pass };
+  });
+
+  const passedCount = entries.filter(e => e.pass === true).length;
+  const totalKnown = entries.filter(e => e.pass !== null).length;
+  const ec07 = entries.find(e => e.key === 'EC-07');
+
+  if (totalKnown === 0) {
+    summary.textContent = '—';
+    summary.className = 'text-[9px] mono font-bold text-slate-500';
+  } else if (passedCount === totalKnown) {
+    summary.textContent = `${passedCount}/${totalKnown} PASS`;
+    summary.className = 'text-[9px] mono font-bold text-emerald-400';
+  } else {
+    summary.textContent = `${passedCount}/${totalKnown} PASS`;
+    summary.className = 'text-[9px] mono font-bold text-red-400';
+  }
+
+  list.innerHTML = entries.map(e => {
+    let badgeCls, badgeTxt;
+    if (e.pass === true) {
+      badgeCls = 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300';
+      badgeTxt = '✓';
+    } else if (e.pass === false) {
+      badgeCls = 'border-red-500/50 bg-red-500/15 text-red-300';
+      badgeTxt = '✕';
+    } else {
+      badgeCls = 'border-slate-700/60 bg-slate-800/40 text-slate-500';
+      badgeTxt = '·';
+    }
+    const isCriticalFail = e.key === 'EC-07' && e.pass === false;
+    const rowCls = isCriticalFail
+      ? 'border-red-500/70 bg-red-600/25 shadow-[0_0_8px_rgba(239,68,68,0.4)]'
+      : badgeCls;
+    return `<div class="flex items-center justify-between px-1.5 py-1 rounded border ${rowCls}">
+      <span class="text-slate-300 truncate" title="${e.label}">${e.key}</span>
+      <span class="font-bold ${isCriticalFail ? 'text-red-200' : ''}">${badgeTxt}</span>
+    </div>`;
+  }).join('');
+
+  if (ec07 && ec07.pass === false) {
+    summary.textContent = '⚠ NO-GO (EC-07)';
+    summary.className = 'text-[9px] mono font-bold text-red-400 pulse-red';
+  }
+}
+
+/* ============================================================================
+   4. PRECOMPUTED SCENARIO SCORES & ECLIPSE FINDER
+   ============================================================================ */
+const eclipseCache = {};
+function findEclipseHourForSite(site, twId) {
+  const key = site.id + '-' + twId;
+  if (eclipseCache[key] !== undefined) return eclipseCache[key];
+  const dur = TW_DURATION[twId] || 720, t0 = TW_T0[twId] || 0;
+  let bestT = 0, bestD = 999;
+  for (let t = 0; t <= dur; t += 1) {
+    const s = angularSep(sunAzimuthDeg(site.lat, site.lon, t0 + t), sunElevationDeg(site.lat, t0 + t), earthAzimuthDeg(site.lat, site.lon, t0 + t), earthElevationDeg(site.lat, site.lon, t0 + t));
+    if (s < bestD) { bestD = s; bestT = t; }
+  }
+  const lo = Math.max(0, bestT - 1), hi = Math.min(dur, bestT + 1);
+  let fine = bestT;
+  for (let t = lo; t <= hi; t += 0.05) {
+    const s = angularSep(sunAzimuthDeg(site.lat, site.lon, t0 + t), sunElevationDeg(site.lat, t0 + t), earthAzimuthDeg(site.lat, site.lon, t0 + t), earthElevationDeg(site.lat, site.lon, t0 + t));
+    if (s < bestD) { bestD = s; fine = t; }
+  }
+  eclipseCache[key] = fine;
+  return fine;
+}
+let globalEclipseT = null;
+function getGlobalEclipseHour() {
+  if (globalEclipseT === null) globalEclipseT = findEclipseHourForSite(SITES.find(s => s.id === 'malapert'), 'TW-1');
+  return globalEclipseT;
+}
+const PRECOMPUTED = (function () {
+  const out = {};
+  for (const site of SITES) for (const tw of TWS) {
+    const dur = TW_DURATION[tw] || 720, eT = findEclipseHourForSite(site, tw);
+    let ps = 0, cs = 0, ec = 0, mi = 0, cur = 0, n = 0, t = 0;
+    while (t <= dur) {
+      const near = Math.abs(t - eT) < 12;
+      const k = computeSkyState(site, tw, t);
+      if (k.sunFactor > 0.05) { ps++; cur = 0; } else { cur += near ? 0.25 : 1; if (cur > mi) mi = cur; }
+      if (k.commActive) cs++;
+      if (k.isEclipse) ec += near ? 0.25 : 1;
+      n++; t += near ? 0.25 : 1;
+    }
+    mi = Math.max(mi, cur);
+    out[site.id + '-' + tw] = { powerPct: ps / n * 100, commPct: cs / n * 100, eclipseHours: ec, maxIlluminationInterruption: mi };
+  }
+  return out;
+})();
+
+/* ============================================================================
+   Safeness — API 优先，本地兜底
+   ============================================================================ */
+function computeSafeness(site) {
+  const api = getApiResult(site.id, state.activeTW);
+  const slopeDeg = api?.site_info?.slope_deg ?? SITE_BASE[site.id].slopeDeg;
+  const psrKm = api?.site_info?.psr_distance_km ?? SITE_BASE[site.id].psrDistanceKm;
+
+  let ss = slopeDeg <= 5 ? 100
+    : slopeDeg <= 8 ? 100 - (slopeDeg - 5) * 15
+    : Math.max(0, 55 - (slopeDeg - 8) * 20);
+  let ps = psrKm <= 2 ? 100
+    : psrKm <= 10 ? 100 - (psrKm - 2) * 6
+    : Math.max(0, 52 - (psrKm - 10) * 3);
+  const ob = SITE_BASE[site.id].obstacleDensity === 'HIGH' ? 20
+    : SITE_BASE[site.id].obstacleDensity === 'MED' ? 10 : 0;
+  return 0.5 * ss + 0.3 * ps + 0.2 * (100 - ob);
+}
+
+/* ============================================================================
+   Score — API 优先（含 EC-07 No-Go 硬约束），本地兜底
+   ============================================================================ */
+function computeScore(site, tw) {
+  const api = getApiResult(site.id, tw);
+  if (api) {
+    const ec = api.engineering_constraints || {};
+    const rawEc07 = ec['EC-07'] ?? ec['EC-07_illum'] ?? true;
+    const ec07 = typeof rawEc07 === 'object' && rawEc07 !== null ? rawEc07.pass : Boolean(rawEc07);
+    const total = ec07 ? api.summary.score : 0;
+    return {
+      safeness: computeSafeness(site),
+      power: api.summary.power_pct,
+      comm: api.summary.comm_pct,
+      total: total,
+      maxInt: api.summary.max_dark_hours,
+      assessment: ec07 ? api.summary.assessment : 'No-Go',
+      ec07_pass: ec07
+    };
+  }
+  const p = PRECOMPUTED[site.id + '-' + tw];
+  const s = computeSafeness(site);
+  return {
+    safeness: s,
+    power: p.powerPct,
+    comm: p.commPct,
+    total: 0.4 * s + 0.3 * p.powerPct + 0.3 * p.commPct,
+    maxInt: p.maxIlluminationInterruption,
+    assessment: null,
+    ec07_pass: null
+  };
+}
+function riskOf(assess, fallback) { if (!assess) return fallback; if (assess === 'Excellent' || assess === 'Good') return 'low'; if (assess === 'Challenging') return 'med'; return 'high'; }
+function scoreColor(t) { return t >= 75 ? '#10b981' : t >= 55 ? '#eab308' : '#ef4444'; }
+
+/* ============================================================================
+   5. STATE & MODE MANAGEMENT (Including Module C.1 Bug 1 Fix)
+   ============================================================================ */
+const state = {
+  mode: 'planner',
+  moonView: '3d',
+  selectedSiteId: 'gerlache',
+  activeTW: 'TW-1',
+  timeHours: 216,
+  playing: false,
+  speed: 1
+};
+let lastMatrixHash = '', lastSiteListHash = '', lastEduSiteHash = '', lastBuilt3DSiteId = '';
+
+function getSite() { return SITES.find(s => s.id === state.selectedSiteId) || SITES[0]; }
+
+function setMode(mode) {
+  state.mode = mode;
+  document.body.className = 'mode-' + mode;
+  updateUI();
+  // ★ 等 DOM 布局稳定后再 resize 3D 渲染器
+  setTimeout(() => {
+    if (moon3DRenderer && state.mode === 'planner' && state.moonView === '3d') {
+      const c = document.getElementById('moon3DContainer');
+      if (c && c.clientWidth > 0 && c.clientHeight > 0) {
+        moon3DRenderer.setSize(c.clientWidth, c.clientHeight);
+        moon3DCam.aspect = c.clientWidth / c.clientHeight;
+        moon3DCam.updateProjectionMatrix();
+      }
+    }
+  }, 30);
+}
+
+/* ============================================================================
+   FIX 2 & 3: Unified POV Viewport + Proper Vertical Occlusion
+   ============================================================================ */
+function renderPOVCanvas(canvas, viewMode) {
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
+  const dpr = window.devicePixelRatio || 1, W = rect.width, H = rect.height;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const site = getSite();
+  const sky = computeSkyState(site, state.activeTW, state.timeHours);
+  const targetType = viewMode || 'earth';
+  const targetAz = targetType === 'sun' ? sky.sunAz : sky.earthAz;
+  const relAzOf = az => {
+    let d = az - targetAz;
+    while (d > 180) d -= 360;
+    while (d < -180) d += 360;
+    return d;
+  };
+
+  const FOV = 65;
+  let minEl = Infinity, maxEl = -Infinity;
+  for (let az = targetAz - FOV; az <= targetAz + FOV; az += 0.5) {
+    const el = horizonAt(site.id, az);
+    if (el < minEl) minEl = el;
+    if (el > maxEl) maxEl = el;
+  }
+  const allMin = Math.min(minEl, sky.sunEl, sky.earthEl, -1);
+  const allMax = Math.max(maxEl, sky.sunEl, sky.earthEl, 8);
+  const span = Math.max(4.0, allMax - allMin);
+
+  const elToY = el => {
+    const norm = (el - allMin) / span;
+    return H * 0.95 - norm * (H * 0.90);
+  };
+
+  const relSun = relAzOf(sky.sunAz), sunX = W * 0.5 + (relSun / FOV) * (W * 0.46);
+  const relEarth = relAzOf(sky.earthAz), earthX = W * 0.5 + (relEarth / FOV) * (W * 0.46);
+  const sunY = elToY(sky.sunEl), earthY = elToY(sky.earthEl);
+  const earthR = Math.max(14, W * 0.028), sunR = Math.max(7, earthR * 0.42);
+
+  const sunOccluded = sky.sunEl <= sky.maskAtSun;
+  const earthOccluded = sky.earthEl <= sky.maskAtEarth;
+
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, H * 0.9);
+  if (sky.isEclipse) {
+    skyGrad.addColorStop(0, '#050110');
+    skyGrad.addColorStop(0.55, '#1e0716');
+    skyGrad.addColorStop(1, '#3a0a1c');
+  } else {
+    skyGrad.addColorStop(0, '#000206');
+    skyGrad.addColorStop(0.7, '#050c18');
+    skyGrad.addColorStop(1, '#0e1626');
+  }
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  const rnd = mulberry32(7717);
+  ctx.fillStyle = 'rgba(226,232,240,0.75)';
+  for (let i = 0; i < 180; i++) {
+    const sx = rnd() * W, sy = rnd() * (H * 0.4), sz = rnd() < 0.82 ? 1.1 : 1.9;
+    ctx.fillRect(sx, sy, sz, sz);
+  }
+
+  // Sun
+  if (Math.abs(relSun) <= FOV + 5) {
+    if (sunOccluded && !sky.isEclipse) {
+      ctx.globalAlpha = 0.2;
+      ctx.beginPath(); ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+      ctx.fillStyle = '#000000'; ctx.fill();
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)'; ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
+    } else if (!sky.isEclipse) {
+      const sg = ctx.createRadialGradient(sunX, sunY, 1, sunX, sunY, sunR * 5.5);
+      sg.addColorStop(0, 'rgba(254, 240, 138, 0.98)');
+      sg.addColorStop(0.4, 'rgba(250, 204, 21, 0.42)');
+      sg.addColorStop(1, 'rgba(250, 204, 21, 0)');
+      ctx.fillStyle = sg;
+      ctx.beginPath(); ctx.arc(sunX, sunY, sunR * 5.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+      ctx.fillStyle = '#fef08a'; ctx.fill();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.stroke();
+    }
+  }
+
+  // Earth
+  if (Math.abs(relEarth) <= FOV + 5) {
+    if (earthOccluded && !sky.isEclipse) {
+      ctx.globalAlpha = 0.2;
+      ctx.beginPath(); ctx.arc(earthX, earthY, earthR, 0, Math.PI * 2);
+      ctx.fillStyle = '#000000'; ctx.fill();
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)'; ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
+    } else if (sky.isEclipse) {
+      const eg = ctx.createRadialGradient(earthX, earthY, earthR * 0.85, earthX, earthY, earthR * 2.8);
+      eg.addColorStop(0, 'rgba(251, 146, 60, 0.98)');
+      eg.addColorStop(0.45, 'rgba(239, 68, 68, 0.58)');
+      eg.addColorStop(1, 'rgba(239, 68, 68, 0)');
+      ctx.fillStyle = eg;
+      ctx.beginPath(); ctx.arc(earthX, earthY, earthR * 2.8, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(earthX, earthY, earthR, 0, Math.PI * 2);
+      ctx.fillStyle = '#070a12'; ctx.fill();
+      ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2.5; ctx.stroke();
+    } else {
+      const eg = ctx.createRadialGradient(earthX - earthR * 0.3, earthY - earthR * 0.3, earthR * 0.15, earthX, earthY, earthR);
+      eg.addColorStop(0, '#bae6fd');
+      eg.addColorStop(0.55, '#0284c7');
+      eg.addColorStop(1, '#082f49');
+      ctx.beginPath(); ctx.arc(earthX, earthY, earthR, 0, Math.PI * 2);
+      ctx.fillStyle = eg; ctx.fill();
+      ctx.strokeStyle = 'rgba(186, 230, 253, 0.85)'; ctx.lineWidth = 1.2; ctx.stroke();
+    }
+  }
+
+  // Far ridge
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for (let x = 0; x <= W; x += 3) {
+    const rel = ((x / W) - 0.5) * 130;
+    const el = horizonAt(site.id, targetAz + rel * 0.85 + 25) * 0.85 + minEl * 0.15;
+    ctx.lineTo(x, elToY(el));
+  }
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(10, 18, 32, 0.65)';
+  ctx.fill();
+
+  // Main ridge
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  const rockRnd = mulberry32(31337);
+  let maxPeakX = W / 2, maxPeakY = H / 2, maxPeakEl = -99;
+  for (let x = 0; x <= W; x += 1) {
+    const rel = ((x / W) - 0.5) * 130;
+    const el = horizonAt(site.id, targetAz + rel);
+    const rockNoise = (rockRnd() - 0.5) * 0.18;
+    const y = elToY(el + rockNoise);
+    if (el > maxPeakEl) { maxPeakEl = el; maxPeakX = x; maxPeakY = y; }
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W, H);
+  ctx.closePath();
+
+  const mtnGrad = ctx.createLinearGradient(0, H * 0.2, 0, H);
+  if (sky.isEclipse) {
+    mtnGrad.addColorStop(0, '#2a0f1c');
+    mtnGrad.addColorStop(0.5, '#110608');
+    mtnGrad.addColorStop(1, '#020104');
+  } else if (sky.sunOK) {
+    mtnGrad.addColorStop(0, '#1e293b');
+    mtnGrad.addColorStop(0.45, '#0d1524');
+    mtnGrad.addColorStop(1, '#010409');
+  } else {
+    mtnGrad.addColorStop(0, '#0f172a');
+    mtnGrad.addColorStop(1, '#010205');
+  }
+  ctx.fillStyle = mtnGrad;
+  ctx.fill();
+
+  const crestColor = targetType === 'sun'
+    ? (sky.sunOK ? 'rgba(250, 204, 21, 0.85)' : 'rgba(239, 68, 68, 0.55)')
+    : (sky.earthOK ? 'rgba(34, 211, 238, 0.85)' : 'rgba(239, 68, 68, 0.55)');
+  ctx.strokeStyle = crestColor;
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  // Sight line + label
+  if (targetType === 'sun' && Math.abs(relSun) <= FOV) {
+    ctx.beginPath(); ctx.moveTo(W * 0.5, H * 0.98); ctx.lineTo(sunX, sunY);
+    ctx.strokeStyle = sunOccluded ? 'rgba(239, 68, 68, 0.6)' : 'rgba(250, 204, 21, 0.55)';
+    ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+
+    ctx.fillStyle = sunOccluded ? '#f87171' : '#fde047';
+    ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(
+      sky.isEclipse ? '🌑 SUN ECLIPSED BY EARTH'
+        : (sunOccluded ? `⚠ SUN OCCLUDED BY +${sky.maskAtSun.toFixed(1)}° RIDGE`
+                       : `☀️ SUN +${sky.sunEl.toFixed(1)}° CLEAR`),
+      sunX, Math.max(26, sunY - sunR - 8)
+    );
+  }
+
+  if (targetType === 'earth' && Math.abs(relEarth) <= FOV) {
+    ctx.beginPath(); ctx.moveTo(W * 0.5, H * 0.98); ctx.lineTo(earthX, earthY);
+    ctx.strokeStyle = earthOccluded ? 'rgba(239, 68, 68, 0.6)' : 'rgba(34, 211, 238, 0.6)';
+    ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+
+    ctx.fillStyle = sky.isEclipse ? '#fb923c' : (earthOccluded ? '#f87171' : '#67e8f9');
+    ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(
+      sky.isEclipse ? '🌍 EARTH CORONA · DTE 100%'
+        : (earthOccluded ? `⚠ EARTH OCCLUDED BY +${sky.maskAtEarth.toFixed(1)}° RIDGE`
+                         : `🌍 EARTH +${sky.earthEl.toFixed(1)}° CLEAR · DTE ACTIVE`),
+      earthX, Math.max(26, earthY - earthR - 8)
+    );
+  }
+
+  // Ridge peak annotation
+  if (maxPeakEl > minEl + 1.5 && maxPeakX > 40 && maxPeakX < W - 40) {
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.75)';
+    ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(`▲ Ridge +${maxPeakEl.toFixed(1)}°`, maxPeakX, Math.max(14, maxPeakY - 6));
+  }
+}
+
+/* ============================================================================
+   7. REAL 3D CRATER BOWL TERRAIN MESH
+   ============================================================================ */
+let moon3DInit = false, moon3DScene, moon3DCam, moon3DRenderer, moon3DMesh, sunDirArrow, earthDirArrow;
+let moon3DTargetTheta = 0.92, moon3DTargetPhi = 0.65;
+let moon3DCurrentTheta = 0.92, moon3DCurrentPhi = 0.65;
+
+function createCraterBowlGeometry(siteId) {
+  const N_AZ = 180;
+  const N_RAD = 24;
+  const maxR = 2.2;
+  const positions = [];
+  const colors = [];
+  const indices = [];
+
+  for (let ir = 0; ir <= N_RAD; ir++) {
+    const frac = ir / N_RAD;
+    const r = frac * maxR;
+
+    for (let ia = 0; ia <= N_AZ; ia++) {
+      const azDeg = (ia / N_AZ) * 360;
+      const rad = (azDeg - 90) * Math.PI / 180;
+      const horizonEl = Math.max(-1, horizonAt(siteId, azDeg));
+
+      const wallCurve = Math.pow(Math.max(0, (frac - 0.15) / 0.85), 1.65);
+      const microRough = (frac > 0.1 && frac < 0.95)
+        ? 0.03 * Math.sin(azDeg * 0.25 + ir * 0.9)
+        : 0;
+      const y = wallCurve * (horizonEl * 0.14) + microRough;
+
+      const x = Math.cos(rad) * r;
+      const z = Math.sin(rad) * r;
+      positions.push(x, y, z);
+
+      const hNorm = Math.min(1, Math.max(0, (y + 0.05) / 0.95));
+      const cR = 0.18 + hNorm * 0.45;
+      const cG = 0.24 + hNorm * 0.50;
+      const cB = 0.34 + hNorm * 0.55;
+      colors.push(cR, cG, cB);
+    }
+  }
+
+  const stride = N_AZ + 1;
+  for (let ir = 0; ir < N_RAD; ir++) {
+    for (let ia = 0; ia < N_AZ; ia++) {
+      const a = ir * stride + ia;
+      const b = (ir + 1) * stride + ia;
+      const c = ir * stride + (ia + 1);
+      const d = (ir + 1) * stride + (ia + 1);
+      indices.push(a, b, c);
+      indices.push(b, d, c);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function initMoon3D() {
+  const container = document.getElementById('moon3DContainer');
+  if (!container) return;
+  const w = container.clientWidth || 500, h = container.clientHeight || 260;
+
+  moon3DScene = new THREE.Scene();
+  moon3DCam = new THREE.PerspectiveCamera(42, w / h, 0.1, 100);
+
+  moon3DRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  moon3DRenderer.setSize(w, h);
+  moon3DRenderer.setPixelRatio(window.devicePixelRatio || 1);
+  container.innerHTML = '';
+  container.appendChild(moon3DRenderer.domElement);
+
+  const site = getSite();
+  lastBuilt3DSiteId = site.id;
+  const geo = createCraterBowlGeometry(site.id);
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.88,
+    metalness: 0.08,
+    flatShading: true,
+    side: THREE.DoubleSide
+  });
+  moon3DMesh = new THREE.Mesh(geo, mat);
+  moon3DScene.add(moon3DMesh);
+
+  const ringGeo = new THREE.RingGeometry(2.18, 2.22, 96);
+  ringGeo.rotateX(-Math.PI / 2);
+  const ringMesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x22d3ee, side: THREE.DoubleSide, transparent: true, opacity: 0.45 }));
+  ringMesh.position.y = 0.02;
+  moon3DScene.add(ringMesh);
+
+  const landerBeacon = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.08, 0.18, 16),
+    new THREE.MeshBasicMaterial({ color: 0x22d3ee })
+  );
+  landerBeacon.position.set(0, 0.09, 0);
+  moon3DScene.add(landerBeacon);
+
+  sunDirArrow = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.1, 0), new THREE.Vector3(2, 0.6, 0)]),
+    new THREE.LineBasicMaterial({ color: 0xfacc15 })
+  );
+  moon3DScene.add(sunDirArrow);
+
+  earthDirArrow = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.1, 0), new THREE.Vector3(0, 0.6, -2)]),
+    new THREE.LineBasicMaterial({ color: 0x22d3ee })
+  );
+  moon3DScene.add(earthDirArrow);
+
+  moon3DScene.add(new THREE.AmbientLight(0x94a3b8, 0.55));
+  const keyLight = new THREE.DirectionalLight(0xfffbeb, 1.4);
+  keyLight.position.set(4, 8, 4);
+  moon3DScene.add(keyLight);
+  const rimLight = new THREE.DirectionalLight(0x22d3ee, 0.55);
+  rimLight.position.set(-5, 3, -5);
+  moon3DScene.add(rimLight);
+
+  let drag = false, lx = 0, ly = 0;
+  moon3DRenderer.domElement.addEventListener('mousedown', e => { drag = true; lx = e.clientX; ly = e.clientY; });
+  window.addEventListener('mouseup', () => { drag = false; });
+  moon3DRenderer.domElement.addEventListener('mousemove', e => {
+    if (!drag) return;
+    moon3DTargetPhi -= (e.clientX - lx) * 0.01;
+    moon3DTargetTheta = Math.max(0.25, Math.min(1.42, moon3DTargetTheta - (e.clientY - ly) * 0.01));
+    lx = e.clientX; ly = e.clientY;
+  });
+
+  const animate = () => {
+    requestAnimationFrame(animate);
+    if (state.moonView !== '3d' || state.mode !== 'planner') return;
+    moon3DCurrentPhi += (moon3DTargetPhi - moon3DCurrentPhi) * 0.14;
+    moon3DCurrentTheta += (moon3DTargetTheta - moon3DCurrentTheta) * 0.14;
+    const r = 4.1;
+    moon3DCam.position.set(
+      r * Math.sin(moon3DCurrentTheta) * Math.sin(moon3DCurrentPhi),
+      r * Math.cos(moon3DCurrentTheta),
+      r * Math.sin(moon3DCurrentTheta) * Math.cos(moon3DCurrentPhi)
+    );
+    moon3DCam.lookAt(0, 0.25, 0);
+    moon3DRenderer.render(moon3DScene, moon3DCam);
+  };
+  animate();
+  moon3DInit = true;
+}
+
+function updateMoon3DTerrain() {
+  if (!moon3DInit) initMoon3D();
+  if (!moon3DMesh) return;
+  const site = getSite();
+  if (lastBuilt3DSiteId !== site.id) {
+    const geo = createCraterBowlGeometry(site.id);
+    moon3DMesh.geometry.dispose();
+    moon3DMesh.geometry = geo;
+    lastBuilt3DSiteId = site.id;
+  }
+  const sky = computeSkyState(site, state.activeTW, state.timeHours);
+  const sRad = (sky.sunAz - 90) * Math.PI / 180, sEl = Math.max(0, sky.sunEl) * Math.PI / 180;
+  const eRad = (sky.earthAz - 90) * Math.PI / 180, eEl = Math.max(0, sky.earthEl) * Math.PI / 180;
+  const L = 2.4;
+  if (sunDirArrow) {
+    sunDirArrow.geometry.setFromPoints([
+      new THREE.Vector3(0, 0.12, 0),
+      new THREE.Vector3(Math.cos(sRad) * L, 0.12 + Math.sin(sEl) * L * 2.5, Math.sin(sRad) * L)
+    ]);
+  }
+  if (earthDirArrow) {
+    earthDirArrow.geometry.setFromPoints([
+      new THREE.Vector3(0, 0.12, 0),
+      new THREE.Vector3(Math.cos(eRad) * L, 0.12 + Math.sin(eEl) * L * 2.5, Math.sin(eRad) * L)
+    ]);
+  }
+}
+
+function setMoonView(mode) {
+  state.moonView = mode;
+  document.getElementById('moon2DCanvas').classList.toggle('hidden', mode !== '2d');
+  document.getElementById('moon3DContainer').classList.toggle('hidden', mode !== '3d');
+  document.getElementById('btnMoon2D').className = mode === '2d' ? 'view-btn on' : 'view-btn off';
+  document.getElementById('btnMoon3D').className = mode === '3d' ? 'view-btn on' : 'view-btn off';
+  updateUI();
+}
+
+/* ============================================================================
+   8. 360° RADAR & 2D POLAR MAP
+   ============================================================================ */
+function drawHorizonRadar(canvas, peakLabelEl) {
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
+  const dpr = window.devicePixelRatio || 1, W = rect.width, H = rect.height;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.40;
+  const site = getSite(), sky = computeSkyState(site, state.activeTW, state.timeHours);
+  const MAX_EL = 15;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = '#050914'; ctx.fill();
+
+  const craterGrad = ctx.createRadialGradient(cx, cy, R * 0.08, cx, cy, R);
+  craterGrad.addColorStop(0, '#1e293b');
+  craterGrad.addColorStop(1, '#050914');
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = craterGrad; ctx.fill();
+
+  const rnd = mulberry32(101);
+  for (let i = 0; i < 16; i++) {
+    const a = rnd() * Math.PI * 2, d = rnd() * R * 0.65, cr = (0.04 + rnd() * 0.08) * R;
+    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, cr, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fill();
+  }
+
+  for (let e = 5; e <= MAX_EL; e += 5) {
+    const r = R * (e / MAX_EL);
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(34,211,238,0.14)'; ctx.stroke();
+  }
+  for (let a = 0; a < 360; a += 45) {
+    const rad = (a - 90) * Math.PI / 180;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(rad) * R, cy + Math.sin(rad) * R);
+    ctx.strokeStyle = 'rgba(34,211,238,0.12)'; ctx.stroke();
+  }
+  ctx.fillStyle = '#22d3ee'; ctx.font = 'bold 10px ui-monospace'; ctx.textAlign = 'center';
+  ctx.fillText('N', cx, cy - R - 4); ctx.fillText('S', cx, cy + R + 12);
+  ctx.fillText('E', cx + R + 10, cy + 3); ctx.fillText('W', cx - R - 10, cy + 3);
+
+  ctx.beginPath();
+  let peak = 0;
+  for (let a = 0; a <= 360; a += 2) {
+    const el = Math.max(0, horizonAt(site.id, a));
+    if (el > peak) peak = el;
+    const rad = (a - 90) * Math.PI / 180, r = R * Math.min(1, el / MAX_EL);
+    const x = cx + Math.cos(rad) * r, y = cy + Math.sin(rad) * r;
+    if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(148,163,184,0.28)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(226,232,240,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
+
+  const sunRad = (sky.sunAz - 90) * Math.PI / 180, sunR = R * Math.min(1, Math.max(0, sky.sunEl) / MAX_EL);
+  ctx.beginPath(); ctx.arc(cx + Math.cos(sunRad) * sunR, cy + Math.sin(sunRad) * sunR, 5.5, 0, Math.PI * 2);
+  ctx.fillStyle = sky.sunOK ? '#facc15' : '#ef4444'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.stroke();
+
+  const er = (sky.earthAz - 90) * Math.PI / 180, eR = R * Math.min(1, Math.max(0, sky.earthEl) / MAX_EL);
+  ctx.beginPath(); ctx.arc(cx + Math.cos(er) * eR, cy + Math.sin(er) * eR, 5.5, 0, Math.PI * 2);
+  ctx.fillStyle = sky.earthOK ? '#22d3ee' : '#ef4444'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.stroke();
+
+  if (peakLabelEl) peakLabelEl.textContent = `Peak +${peak.toFixed(1)}°`;
+}
+
+function drawMoon2DMapPlanner() {
+  const canvas = document.getElementById('moon2DCanvas');
+  if (!canvas || state.moonView !== '2d') return;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const W = rect.width, H = rect.height, size = Math.max(180, Math.min(W, H));
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cx = W / 2, cy = H / 2, R = size * 0.42;
+
+  ctx.fillStyle = '#03060f'; ctx.fillRect(0, 0, W, H);
+  const grad = ctx.createRadialGradient(cx - R * 0.2, cy - R * 0.2, R * 0.05, cx, cy, R);
+  grad.addColorStop(0, '#1e293b'); grad.addColorStop(1, '#090f1d');
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = grad; ctx.fill();
+  ctx.strokeStyle = 'rgba(34,211,238,0.35)'; ctx.stroke();
+
+  for (let lat = 85; lat <= 89; lat++) {
+    const r = R * ((90 - lat) / 5);
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(34,211,238,0.14)'; ctx.stroke();
+    ctx.fillStyle = 'rgba(34,211,238,0.45)'; ctx.font = '9px ui-monospace'; ctx.fillText(`-${lat}°`, cx + r + 3, cy - 2);
+  }
+
+  const clickable = [];
+  SITES.forEach(s => {
+    const colat = Math.min(5.2, 90 - Math.abs(s.lat)), r = R * (colat / 5.2), a = (s.lon - 90) * Math.PI / 180;
+    const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r;
+    clickable.push({ id: s.id, x: px, y: py });
+    const isSel = s.id === state.selectedSiteId;
+    if (isSel) {
+      ctx.beginPath(); ctx.arc(px, py, 12, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(34,211,238,0.22)'; ctx.fill();
+      ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(px, py, 5.5, 0, Math.PI * 2);
+    ctx.fillStyle = s.riskLevel === 'low' ? '#10b981' : '#eab308'; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = isSel ? '#fff' : '#94a3b8';
+    ctx.font = (isSel ? 'bold ' : '') + '10px ui-monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(s.name.split(' ')[0], px, py - 9);
+  });
+
+  canvas.onclick = e => {
+    const b = canvas.getBoundingClientRect(), mx = e.clientX - b.left, my = e.clientY - b.top;
+    for (const pt of clickable) if (Math.hypot(mx - pt.x, my - pt.y) < 18) { state.selectedSiteId = pt.id; updateUI(); break; }
+  };
+}
+
+/* ============================================================================
+   9. UI PANELS & MATRICES
+   ============================================================================ */
+function renderSiteList() {
+  const list = document.getElementById('siteList'), listEdu = document.getElementById('siteListEdu');
+  const hash = SITES.map(s => s.id).join(',') + '|' + (API.live ? 'live' : 'local') + '|' + state.activeTW;
+  const html = SITES.map(s => {
+    const api = getApiResult(s.id, state.activeTW);
+    const rl = riskOf(api?.summary.assessment, s.riskLevel);
+    const col = rl === 'low' ? 'bg-emerald-400' : rl === 'med' ? 'bg-yellow-400' : 'bg-red-500';
+    return `<button data-site="${s.id}" class="site-btn ${s.id === state.selectedSiteId ? 'active' : ''}">
+      <div class="flex justify-between items-center gap-1">
+        <span class="font-bold text-slate-100">${s.name}</span>
+        <span class="w-2 h-2 rounded-full ${col}"></span>
+      </div>
+      <div class="mono text-[10px] text-slate-400 mt-0.5">${Math.abs(s.lat).toFixed(2)}°S · ${((s.lon + 360) % 360).toFixed(1)}°E · Slope ${s.slopeDeg.toFixed(1)}°</div>
+    </button>`;
+  }).join('');
+
+  if (list) {
+    if (hash !== lastSiteListHash) {
+      list.innerHTML = html; lastSiteListHash = hash;
+      list.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { state.selectedSiteId = b.dataset.site; updateUI(); }));
+    }
+    list.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.site === state.selectedSiteId));
+  }
+  if (listEdu) {
+    if (hash !== lastEduSiteHash) {
+      listEdu.innerHTML = html; lastEduSiteHash = hash;
+      listEdu.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { state.selectedSiteId = b.dataset.site; updateUI(); }));
+    }
+    listEdu.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.site === state.selectedSiteId));
+  }
+}
+
+function renderTWList() {
+  ['twListPlanner', 'twListEdu'].forEach(containerId => {
+    const el = document.getElementById(containerId); if (!el) return;
+    el.innerHTML = TWS.map(tw => `<button data-tw="${tw}" class="tw-btn ${tw === state.activeTW ? 'active' : ''}">
+      <div class="font-bold">${tw}</div>
+      <div class="mono text-[10px] text-slate-400">${TW_DEFS[tw].label.slice(5)}</div>
+    </button>`).join('');
+    el.querySelectorAll('button').forEach(b => b.addEventListener('click', () => setTW(b.dataset.tw)));
+  });
+}
+
+function setTW(tw) {
+  state.activeTW = tw; state.timeHours = 0;
+  const s = document.getElementById('globalTimeSlider'); if (s) { s.max = TW_DURATION[tw]; s.value = 0; }
+  const r = document.getElementById('rangeLabel'); if (r) r.textContent = `0h → ${TW_DURATION[tw]}h`;
+  updateUI();
+}
+
+function renderPlannerRight() {
+  const site = getSite(), sc = computeScore(site, state.activeTW);
+  const rl = riskOf(sc.assessment, site.riskLevel);
+
+  document.getElementById('scoreName').textContent = site.name;
+  document.getElementById('scoreCoords').textContent = `${Math.abs(site.lat).toFixed(2)}°S · ${((site.lon + 360) % 360).toFixed(1)}°E`;
+  const totalEl = document.getElementById('scoreTotal');
+  totalEl.textContent = sc.total.toFixed(1);
+  totalEl.style.color = scoreColor(sc.total);
+  document.getElementById('scoreAssess').textContent = sc.assessment || (rl === 'low' ? 'OPTIMAL' : rl === 'med' ? 'VIABLE' : 'HIGH RISK');
+
+  const badge = document.getElementById('scoreBadge');
+  badge.textContent = rl.toUpperCase() + ' RISK';
+  badge.className = rl === 'low'
+    ? 'px-2 py-0.5 rounded text-[10px] font-bold mono border bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+    : (rl === 'med' ? 'px-2 py-0.5 rounded text-[10px] font-bold mono border bg-amber-500/15 text-amber-300 border-amber-500/40' : 'px-2 py-0.5 rounded text-[10px] font-bold mono border bg-red-500/15 text-red-300 border-red-500/40');
+
+  document.getElementById('dimSafe').textContent = sc.safeness.toFixed(0) + ' / 100';
+  document.getElementById('barSafe').style.width = Math.max(2, sc.safeness) + '%';
+  document.getElementById('dimPower').textContent = sc.power.toFixed(1) + '%';
+  document.getElementById('barPower').style.width = Math.max(2, sc.power) + '%';
+  document.getElementById('dimComm').textContent = sc.comm.toFixed(1) + '%';
+  document.getElementById('barComm').style.width = Math.max(2, sc.comm) + '%';
+
+  const sky = computeSkyState(site, state.activeTW, state.timeHours);
+  document.getElementById('seSunAz').textContent = `Az ${sky.sunAz.toFixed(1)}°`;
+  document.getElementById('seSunEl').textContent = `El ${sky.sunEl.toFixed(2)}° (Mask +${sky.maskAtSun.toFixed(1)}°)`;
+  document.getElementById('seEarthAz').textContent = `Az ${sky.earthAz.toFixed(1)}°`;
+  document.getElementById('seEarthEl').textContent = `El ${sky.earthEl.toFixed(2)}° (Mask +${sky.maskAtEarth.toFixed(1)}°)`;
+
+  const sunSt = document.getElementById('povSunStatus');
+  if (sunSt) {
+    sunSt.textContent = sky.isEclipse ? '🌑 ECLIPSE (0%)' : (sky.sunOK ? '✓ SUNLIT' : '⚠ TERRAIN SHADOW');
+    sunSt.className = sky.isEclipse ? 'text-[10px] mono text-purple-300 font-bold' : (sky.sunOK ? 'text-[10px] mono text-emerald-300' : 'text-[10px] mono text-red-400');
+  }
+  const earthSt = document.getElementById('povEarthStatus');
+  if (earthSt) {
+    earthSt.textContent = sky.earthOK ? '✓ DTE LINK ACTIVE' : '⚠ RIDGE OCCULTED';
+    earthSt.className = sky.earthOK ? 'text-[10px] mono text-cyan-300' : 'text-[10px] mono text-red-400';
+  }
+
+  drawHorizonRadar(document.getElementById('horizonRadarPlanner'), document.getElementById('horizonPeakNote'));
+  renderEcPanel();                    // ← MODULE B
+  renderMatrix();
+}
+
+function renderMatrix() {
+  const el = document.getElementById('matrixPlanner'); if (!el) return;
+  const hash = SITES.map(s => s.id).join(',') + '|' + state.selectedSiteId + '|' + state.activeTW + '|' + (API.live ? 'live' : 'local');
+  if (hash === lastMatrixHash) return;
+  lastMatrixHash = hash;
+  let html = '<table class="w-full border-collapse mono"><thead><tr><th class="text-left px-1 py-0.5 text-[9px] text-cyan-400">Site</th>';
+  TWS.forEach(tw => { html += `<th class="text-center px-0.5 py-0.5 text-[9px] text-cyan-400">${tw}</th>`; });
+  html += '</tr></thead><tbody>';
+  SITES.forEach(s => {
+    html += `<tr><td class="px-1 py-0.5 text-[9px] text-slate-300 whitespace-nowrap">${s.name.split(' ')[0]}</td>`;
+    TWS.forEach(tw => {
+      const sc = computeScore(s, tw);
+      const bg = sc.total > 75 ? 'bg-emerald-500/25 text-emerald-200' : sc.total > 55 ? 'bg-amber-500/20 text-amber-200' : 'bg-red-500/20 text-red-200';
+      const isCur = s.id === state.selectedSiteId && tw === state.activeTW;
+      const isNoGo = sc.ec07_pass === false;
+      html += `<td class="text-center px-0.5 py-0.5 ${bg} ${isNoGo ? 'ring-1 ring-red-500' : ''} ${isCur ? 'ring-1 ring-cyan-400 font-bold' : ''} cursor-pointer rounded text-[10px]" onclick="jumpToCell('${s.id}','${tw}')">${sc.total.toFixed(0)}${isNoGo ? '✕' : ''}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+function jumpToCell(sid, tw) { state.selectedSiteId = sid; setTW(tw); }
+
+/* ============================================================================
+   MODULE E — Educator 3-Step Narrative & Public Story Card
+   ============================================================================ */
+function renderEducatorRight() {
+  const site = getSite();
+  const sky = computeSkyState(site, state.activeTW, state.timeHours);
+  drawHorizonRadar(document.getElementById('horizonRadarEducator'), null);
+
+  // ── 判断当前情境，组织 3 步叙述 ──
+  const steps = [];
+
+  if (sky.isEclipse) {
+    steps.push({
+      cls: 'what',
+      title: '① WHAT IS HAPPENING',
+      body: `Earth is passing directly in front of the Sun. From our landing site, the Earth disk is ~4× wider than the Sun, so it fully covers the solar disk.`
+    });
+    steps.push({
+      cls: 'why',
+      title: '② WHY IT HAPPENS',
+      body: `Both bodies sit on nearly the same line of sight — an alignment that only occurs a few times per lunar year. Earth's angular radius is <b class="text-cyan-300">${(0.95).toFixed(2)}°</b>, the Sun's is <b class="text-yellow-300">${(0.26).toFixed(2)}°</b>.`
+    });
+    steps.push({
+      cls: 'see',
+      title: '③ WHAT YOU SEE',
+      body: `<b class="text-red-400">Solar power → 0%</b> (no sunlight on the panels). <b class="text-cyan-300">Earth comm → 100%</b> (Earth is the closest object in the sky). This is the Eclipse Paradox.`
+    });
+  } else if (!sky.earthOK) {
+    steps.push({
+      cls: 'what',
+      title: '① WHAT IS HAPPENING',
+      body: `Earth is hidden behind a mountain ridge. From our landing site, no line of sight reaches the sky where Earth sits.`
+    });
+    steps.push({
+      cls: 'why',
+      title: '② WHY IT HAPPENS',
+      body: `The crater wall at that azimuth rises to <b class="text-amber-300">+${sky.maskAtEarth.toFixed(1)}°</b>, but Earth's elevation is only <b class="text-cyan-300">+${sky.earthEl.toFixed(1)}°</b>. Terrain wins over target altitude.`
+    });
+    steps.push({
+      cls: 'see',
+      title: '③ WHAT YOU SEE',
+      body: `The Earth disk still renders in the sky view, but as a <b class="text-red-300">faint dashed outline</b> — meaning it's physically behind the ridge. No signal gets through.`
+    });
+  } else if (sky.sunFactor === 0) {
+    steps.push({
+      cls: 'what',
+      title: '① WHAT IS HAPPENING',
+      body: `The Sun is below the terrain horizon — the crater wall blocks direct sunlight, even though the Sun is technically "up" in the sky.`
+    });
+    steps.push({
+      cls: 'why',
+      title: '② WHY IT HAPPENS',
+      body: `Sun elevation is <b class="text-yellow-300">+${sky.sunEl.toFixed(1)}°</b>, but the ridge in that direction is <b class="text-amber-300">+${sky.maskAtSun.toFixed(1)}°</b>. This is common at the lunar South Pole where the Sun never rises far above the horizon.`
+    });
+    steps.push({
+      cls: 'see',
+      title: '③ WHAT YOU SEE',
+      body: `The lander is in <b class="text-amber-300">terrain shadow</b> — battery drains until the Sun reappears. Earth comm still works normally, since that's a separate line of sight.`
+    });
+  } else {
+    steps.push({
+      cls: 'what',
+      title: '① WHAT IS HAPPENING',
+      body: `Both the Sun and Earth clear the surrounding mountain ridges. The site is in a healthy, usable state.`
+    });
+    steps.push({
+      cls: 'why',
+      title: '② WHY IT HAPPENS',
+      body: `Sun elevation <b class="text-yellow-300">+${sky.sunEl.toFixed(1)}°</b> > ridge <b>+${sky.maskAtSun.toFixed(1)}°</b>. Earth elevation <b class="text-cyan-300">+${sky.earthEl.toFixed(1)}°</b> > ridge <b>+${sky.maskAtEarth.toFixed(1)}°</b>.`
+    });
+    steps.push({
+      cls: 'see',
+      title: '③ WHAT YOU SEE',
+      body: `Solar panels charge continuously, and the DTE radio link runs at full quality. This is exactly what a well-chosen CLPS landing site delivers.`
+    });
+  }
+
+  const html = steps.map(s =>
+    `<div class="edu-step ${s.cls}">
+      <div class="edu-step-title" style="color: ${s.cls === 'what' ? '#22d3ee' : s.cls === 'why' ? '#a855f7' : '#facc15'}">${s.title}</div>
+      <div class="edu-step-body">${s.body}</div>
+    </div>`
+  ).join('');
+
+  const eduExplain = document.getElementById('eduExplain');
+  if (eduExplain) {
+    eduExplain.classList.remove('text-[12px]', 'leading-relaxed');
+    eduExplain.innerHTML = html;
+  }
+
+  // ── 日食浮现框 ──
+  const callout = document.getElementById('eclipseCalloutEdu');
+  if (callout) {
+    if (sky.isEclipse) {
+      callout.classList.remove('hidden');
+      callout.innerHTML = `
+        <div class="text-3xl mb-1">🌑</div>
+        <div class="text-lg font-bold text-purple-200 tracking-wider">ECLIPSE PARADOX</div>
+        <div class="text-xs text-slate-300 mb-2">Earth Eclipses the Sun</div>
+        <div class="grid grid-cols-2 gap-3 text-center text-xs mono">
+          <div><div class="text-slate-400 text-[9px]">SOLAR POWER</div><div class="text-red-400 text-base font-bold">0%</div></div>
+          <div><div class="text-slate-400 text-[9px]">EARTH COMM</div><div class="text-cyan-300 text-base font-bold">100%</div></div>
+        </div>
+      `;
+    } else {
+      callout.classList.add('hidden');
+    }
+  }
+
+  // ── 教学小提示：右下角动态浮条 ──
+  const badge = document.getElementById('povLiveBadgeEdu');
+  if (badge) {
+    if (sky.isEclipse) {
+      badge.textContent = '🌑 ECLIPSE MOMENT';
+      badge.className = 'text-[10px] px-2 py-0.5 rounded bg-purple-500/30 border border-purple-400 text-purple-200 mono font-bold edu-tip';
+    } else if (!sky.earthOK || sky.sunFactor === 0) {
+      badge.textContent = '⚠ WATCH THIS SHADOW';
+      badge.className = 'text-[10px] px-2 py-0.5 rounded bg-amber-500/25 border border-amber-400 text-amber-200 mono font-bold edu-tip';
+    } else {
+      badge.textContent = '✓ REAL-TIME GEOMETRY';
+      badge.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-800 text-cyan-300 mono';
+    }
+  }
+}
+
+let lastPubAccent = '';
+function renderPublic() {
+  const site = getSite();
+  const sc = computeScore(site, state.activeTW);
+  const sky = computeSkyState(site, state.activeTW, state.timeHours);
+
+  // ── 顶部三个大圆盘 ──
+  document.getElementById('pubSiteName').textContent = site.name;
+  document.getElementById('pubSiteCoord').textContent = `${Math.abs(site.lat).toFixed(2)}°S · ${((site.lon + 360) % 360).toFixed(1)}°E`;
+  document.getElementById('pubSafe').textContent = sc.safeness.toFixed(0);
+  document.getElementById('pubPower').textContent = sc.power.toFixed(0);
+  document.getElementById('pubComm').textContent = sc.comm.toFixed(0);
+
+  // ── 故事卡：4 种状态，用最简语言讲述 ──
+  const card = document.getElementById('pubStoryCard');
+  const iconEl = document.getElementById('pubStoryIcon');
+  const titleEl = document.getElementById('pubStoryTitle');
+  const bodyEl = document.getElementById('pubStoryBody');
+  if (!card || !iconEl || !titleEl || !bodyEl) return;
+
+  let icon = '🌙', title = '', body = '', accent = 'emerald';
+
+  if (sky.isEclipse) {
+    icon = '🌑';
+    title = 'Earth is Eclipsing the Sun';
+    body = 'This is the Eclipse Paradox — solar power drops to <b class="text-red-400">0%</b>, yet Earth is closer to the sky than ever, so the radio link runs at <b class="text-cyan-300">full strength</b>.';
+    accent = 'purple';
+  } else if (!sky.commActive && sky.sunFactor === 0) {
+    icon = '🔴';
+    title = 'Total Blackout';
+    body = 'A mountain ridge blocks both the Sun and Earth. The lander is on battery power with no signal — a mission-critical scenario.';
+    accent = 'red';
+  } else if (!sky.commActive) {
+    icon = '🟡';
+    title = 'Signal Blocked by Mountain';
+    body = `A ridge of <b>+${sky.maskAtEarth.toFixed(1)}°</b> stands taller than Earth's elevation of <b>+${sky.earthEl.toFixed(1)}°</b>. Solar panels still charge, but the radio is cut off.`;
+    accent = 'amber';
+  } else if (sky.sunFactor === 0) {
+    icon = '⚡';
+    title = 'In Crater Shadow';
+    body = `The crater wall (<b>+${sky.maskAtSun.toFixed(1)}°</b>) hides the low-angle Sun (<b>+${sky.sunEl.toFixed(1)}°</b>). Running on battery, but radio contact is healthy.`;
+    accent = 'amber';
+  } else {
+    icon = '🟢';
+    title = 'Everything Nominal';
+    body = 'Sunlight is powering the array and Earth sits clear above the horizon. This is exactly what a well-chosen landing site looks like.';
+    accent = 'emerald';
+  }
+
+  iconEl.textContent = icon;
+  titleEl.textContent = title;
+  bodyEl.innerHTML = body;
+
+  const borderMap = {
+    emerald: 'rgba(16,185,129,0.6)',
+    amber:   'rgba(245,158,11,0.6)',
+    purple:  'rgba(168,85,247,0.65)',
+    red:     'rgba(239,68,68,0.65)'
+  };
+  const glowMap = {
+    emerald: '0 0 40px rgba(16,185,129,0.35)',
+    amber:   '0 0 40px rgba(245,158,11,0.35)',
+    purple:  '0 0 40px rgba(168,85,247,0.45)',
+    red:     '0 0 40px rgba(239,68,68,0.45)'
+  };
+  card.style.borderColor = borderMap[accent];
+  card.style.boxShadow = glowMap[accent];
+  iconEl.style.filter = accent === 'purple' ? 'drop-shadow(0 0 12px #a855f7)' : 'none';
+
+  // Only re-trigger entrance slide animation when state category changes (prevents 60fps flicker during playback)
+  if (lastPubAccent !== accent) {
+    lastPubAccent = accent;
+    card.classList.remove('story-card');
+    void card.offsetWidth;
+    card.classList.add('story-card');
+  }
+}
+
+function renderFooter() {
+  const site = getSite(), sky = computeSkyState(site, state.activeTW, state.timeHours);
+
+  const tEl = document.getElementById('timeReadout');
+  if (tEl) tEl.textContent = 'T + ' + state.timeHours.toFixed(1) + ' h';
+  const dEl = document.getElementById('dateReadout');
+  if (dEl) {
+    const startMs = new Date(TW_DEFS[state.activeTW].start).getTime();
+    dEl.textContent = new Date(startMs + state.timeHours * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+  }
+
+  const phase = document.getElementById('phaseText');
+  if (phase) {
+    if (sky.isEclipse) { phase.textContent = '🟣 ECLIPSE PARADOX (POWER 0% / COMM 100%)'; phase.className = 'text-purple-300 font-bold'; }
+    else if (!sky.commActive && sky.sunFactor === 0) { phase.textContent = '🔴 TOTAL BLACKOUT'; phase.className = 'text-red-400 font-bold'; }
+    else if (!sky.commActive) { phase.textContent = '🟡 COMM BLOCKED BY MOUNTAIN'; phase.className = 'text-amber-300 font-bold'; }
+    else if (sky.sunFactor === 0) { phase.textContent = '⚡ TERRAIN SHADOW'; phase.className = 'text-amber-300 font-bold'; }
+    else { phase.textContent = '🟢 NOMINAL LOS'; phase.className = 'text-emerald-400 font-bold'; }
+  }
+
+  const pLabel = document.getElementById('paradoxLabel');
+  if (pLabel) {
+    if (sky.isEclipse) {
+      pLabel.style.background = 'rgba(147, 51, 234, 0.95)';
+      pLabel.style.color = '#fff';
+      pLabel.textContent = '⚡ ECLIPSE PARADOX ACTIVE';
+    } else {
+      pLabel.style.background = 'rgba(10, 16, 29, 0.92)';
+      pLabel.style.color = '#d8b4fe';
+      pLabel.textContent = 'DUAL LOCK-ON POV';
+    }
+  }
+
+  // MODULE C: 30-day Gantt strip + Telemetry curves
+  renderGanttBar();
+  renderTelemetryChart();
+}
+
+/* ============================================================================
+   10. 3D SUN-EARTH-MOON ORBIT MODAL (With Module D Umbra Cone & Blood Moon)
+   ============================================================================ */
+let orbitInit = false, orbitScene, orbitCamera, orbitRenderer, moonGroup, sunMesh, earthMesh, moonMesh;
+let isDraggingOrbit = false, prevOrbitMouse = { x: 0, y: 0 };
+const orbitCam = { theta: 0.6, phi: 0.45, radius: 34 };
+
+function initOrbitScene() {
+  if (orbitInit) return;
+  const c = document.getElementById('orbitContainer'); if (!c) return;
+  const w = c.clientWidth || 800, h = c.clientHeight || 500;
+  orbitScene = new THREE.Scene();
+  orbitCamera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
+  orbitRenderer = new THREE.WebGLRenderer({ antialias: true });
+  orbitRenderer.setSize(w, h);
+  orbitRenderer.setPixelRatio(window.devicePixelRatio || 1);
+  c.innerHTML = ''; c.appendChild(orbitRenderer.domElement);
+
+  const sv = [], rnd = mulberry32(12345);
+  for (let i = 0; i < 600; i++) sv.push((rnd() - 0.5) * 300, (rnd() - 0.5) * 300, (rnd() - 0.5) * 300);
+  const starGeo = new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3));
+  orbitScene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x94a3b8, size: 0.35 })));
+  orbitScene.add(new THREE.AmbientLight(0x334155, 0.7));
+  const dl = new THREE.DirectionalLight(0xfffbeb, 1.8); dl.position.set(-22, 0, 0); orbitScene.add(dl);
+
+  sunMesh = new THREE.Mesh(new THREE.SphereGeometry(3.2, 32, 32), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+  sunMesh.position.set(-18, 0, 0); orbitScene.add(sunMesh);
+  sunMesh.add(new THREE.Mesh(new THREE.SphereGeometry(3.8, 32, 32), new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.22 })));
+
+  earthMesh = new THREE.Mesh(new THREE.SphereGeometry(1.1, 32, 32), new THREE.MeshPhongMaterial({ color: 0x0284c7, emissive: 0x082f49 }));
+  orbitScene.add(earthMesh);
+  earthMesh.add(new THREE.Mesh(new THREE.SphereGeometry(1.25, 32, 32), new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.18 })));
+
+  // ── MODULE D: 地球本影锥 (正确几何: 远端收窄至 0) ──
+  const cg = new THREE.CylinderGeometry(0, 2.1, 14, 32, 1, true);
+  cg.rotateZ(-Math.PI / 2);
+  const umbraMat = new THREE.MeshBasicMaterial({
+    color: 0xa855f7,
+    transparent: true,
+    opacity: 0.16,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const umbraCone = new THREE.Mesh(cg, umbraMat);
+  umbraCone.position.set(7, 0, 0);
+  orbitScene.add(umbraCone);
+
+  const pts = [];
+  for (let i = 0; i <= 128; i++) { const a = (i / 128) * Math.PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * 9.5, 0, Math.sin(a) * 9.5)); }
+  orbitScene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.35 })));
+
+  // ── MODULE D: 月球 mesh 单独保存引用, 便于动态调整材质 ──
+  moonGroup = new THREE.Group();
+  moonMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.55, 28, 28),
+    new THREE.MeshStandardMaterial({
+      color: 0xcbd5e1,
+      roughness: 0.85,
+      emissive: 0x000000,
+      emissiveIntensity: 0
+    })
+  );
+  moonGroup.add(moonMesh);
+  const pin = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 12), new THREE.MeshBasicMaterial({ color: 0x22d3ee }));
+  pin.position.set(0, -0.6, 0);
+  moonGroup.add(pin);
+  orbitScene.add(moonGroup);
+
+  const dom = orbitRenderer.domElement;
+  dom.addEventListener('mousedown', e => { isDraggingOrbit = true; prevOrbitMouse = { x: e.clientX, y: e.clientY }; });
+  window.addEventListener('mouseup', () => isDraggingOrbit = false);
+  dom.addEventListener('mousemove', e => {
+    if (!isDraggingOrbit) return;
+    orbitCam.theta -= (e.clientX - prevOrbitMouse.x) * 0.008;
+    orbitCam.phi = Math.max(0.15, Math.min(1.45, orbitCam.phi - (e.clientY - prevOrbitMouse.y) * 0.008));
+    prevOrbitMouse = { x: e.clientX, y: e.clientY };
+    updateOrbitScene();
+  });
+  dom.addEventListener('wheel', e => {
+    e.preventDefault();
+    orbitCam.radius = Math.max(14, Math.min(55, orbitCam.radius + e.deltaY * 0.02));
+    updateOrbitScene();
+  }, { passive: false });
+  orbitInit = true;
+}
+
+function toggleOrbitModal(open) {
+  const m = document.getElementById('orbitModal'); if (!m) return;
+  if (open) {
+    m.style.display = 'flex'; initOrbitScene();
+    setTimeout(() => {
+      const c = document.getElementById('orbitContainer');
+      if (orbitRenderer && c) {
+        orbitRenderer.setSize(c.clientWidth, c.clientHeight);
+        orbitCamera.aspect = c.clientWidth / c.clientHeight;
+        orbitCamera.updateProjectionMatrix();
+      }
+      updateOrbitScene();
+    }, 50);
+  } else m.style.display = 'none';
+}
+
+function updateOrbitScene() {
+  if (!orbitRenderer) return;
+  const tAbs = (TW_T0[state.activeTW] || 0) + state.timeHours;
+  const geAbs = (TW_T0['TW-1'] || 0) + getGlobalEclipseHour();
+  const ang = ((tAbs - geAbs) / PHYS.synodicHours) * Math.PI * 2;
+  const rO = 9.5, inc = PHYS.lunarInclinationDeg * Math.PI / 180;
+
+  // 月球位置（绕地球的椭圆轨道投影）
+  const mx = Math.cos(ang) * rO;
+  const my = Math.sin(ang) * rO * Math.sin(inc);
+  const mz = Math.sin(ang) * rO;
+  moonGroup.position.set(mx, my, mz);
+
+  // 月球自转（同步自转，永远一面朝地球）
+  moonGroup.rotation.y = -ang;
+  // 地球 24h 自转
+  earthMesh.rotation.y = (tAbs / 24.0) * Math.PI * 2;
+
+  // ── MODULE D: 本影判定与月球着色 ──
+  const UMBRA_LEN = 14;
+  const UMBRA_BASE_R = 2.1;
+  const MOON_R = 0.55;
+  let inUmbra = false;
+  let umbraCoverage = 0;
+
+  if (mx > 0 && mx < UMBRA_LEN) {
+    const coneR = UMBRA_BASE_R * (1 - mx / UMBRA_LEN);
+    const radialDist = Math.hypot(my, mz);
+    const denom = MOON_R * 2;
+    const distToEdge = coneR - radialDist;
+    umbraCoverage = Math.max(0, Math.min(1, (distToEdge + MOON_R) / denom));
+    inUmbra = umbraCoverage > 0.35;
+  }
+
+  // 根据本影覆盖度调整月球材质
+  if (moonMesh) {
+    if (inUmbra) {
+      const intensity = 0.15 + umbraCoverage * 0.4;
+      moonMesh.material.color.setRGB(
+        0.65 - 0.15 * umbraCoverage,
+        0.28 - 0.10 * umbraCoverage,
+        0.22 - 0.10 * umbraCoverage
+      );
+      moonMesh.material.emissive.setHex(0x3a0a0a);
+      moonMesh.material.emissiveIntensity = intensity;
+    } else {
+      moonMesh.material.color.setHex(0xcbd5e1);
+      moonMesh.material.emissive.setHex(0x000000);
+      moonMesh.material.emissiveIntensity = 0;
+    }
+  }
+
+  // 相机
+  orbitCamera.position.set(
+    orbitCam.radius * Math.sin(orbitCam.phi) * Math.sin(orbitCam.theta),
+    orbitCam.radius * Math.cos(orbitCam.phi),
+    orbitCam.radius * Math.sin(orbitCam.phi) * Math.cos(orbitCam.theta)
+  );
+  orbitCamera.lookAt(0, 0, 0);
+  orbitRenderer.render(orbitScene, orbitCamera);
+
+  // 更新 HUD 指示器
+  const illumEl = document.getElementById('moonIllumStatus');
+  const umbraEl = document.getElementById('moonUmbraPct');
+  if (illumEl && umbraEl) {
+    if (inUmbra) {
+      illumEl.textContent = '🌑 EARTH ECLIPSE';
+      illumEl.className = 'text-red-400 font-bold';
+    } else {
+      illumEl.textContent = '☀️ SUNLIT';
+      illumEl.className = 'text-emerald-300 font-bold';
+    }
+    umbraEl.textContent = Math.round(umbraCoverage * 100) + '%';
+    umbraEl.className = umbraCoverage > 0.35
+      ? 'text-red-300 font-bold'
+      : umbraCoverage > 0.05
+        ? 'text-amber-300'
+        : 'text-slate-400';
+  }
+}
+
+/* ============================================================================
+   11. MASTER UPDATE & INTERACTION HANDLERS
+   ============================================================================ */
+function updateUI() {
+  renderSiteList();
+  renderTWList();
+  renderFooter();
+
+  if (state.mode === 'planner') {
+    if (state.moonView === '2d') drawMoon2DMapPlanner();
+    else updateMoon3DTerrain();
+    renderPOVCanvas(document.getElementById('povSun'), 'sun');
+    renderPOVCanvas(document.getElementById('povEarth'), 'earth');
+    renderPlannerRight();
+  } else if (state.mode === 'educator') {
+    renderPOVCanvas(document.getElementById('povEducator'), 'earth');
+    renderEducatorRight();
+  } else if (state.mode === 'public') {
+    renderPOVCanvas(document.getElementById('povPublic'), 'earth');
+    renderPublic();
+  }
+
+  if (orbitInit && document.getElementById('orbitModal').style.display === 'flex') updateOrbitScene();
+}
+
+function selectPresetCase(key) {
+  if (key === 'eclipse_case') {
+    state.activeTW = 'TW-1';
+    state.selectedSiteId = 'gerlache';
+    state.timeHours = findEclipseHourForSite(SITES.find(s => s.id === 'gerlache'), 'TW-1');
+  } else if (key === 'good_both') {
+    state.selectedSiteId = 'malapert'; state.timeHours = 48;
+  } else if (key === 'bad_both') {
+    state.selectedSiteId = 'shackleton'; state.timeHours = 110;
+  }
+  const s = document.getElementById('globalTimeSlider');
+  if (s) { s.max = TW_DURATION[state.activeTW]; s.value = state.timeHours; }
+  updateUI();
+}
+
+function triggerEclipseMoment() {
+  const site = getSite(), eT = findEclipseHourForSite(site, state.activeTW);
+  state.timeHours = eT;
+  const s = document.getElementById('globalTimeSlider'); if (s) s.value = eT;
+  updateUI();
+}
+
+let scrubRaf = null;
+function onTimeScrub(v) {
+  state.timeHours = parseFloat(v);
+  if (scrubRaf) cancelAnimationFrame(scrubRaf);
+  scrubRaf = requestAnimationFrame(() => updateUI());
+}
+
+let animFrame = null;
+function togglePlay() {
+  state.playing = !state.playing;
+  ['playPauseBtn', 'playPauseBtnEdu', 'playPauseBtnPub'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.textContent = state.playing ? '⏸ PAUSE' : (id === 'playPauseBtnPub' ? '▶ PLAY 30-DAY WINDOW' : '▶ PLAY');
+  });
+  if (state.playing) {
+    const step = () => {
+      if (!state.playing) return;
+      const mx = TW_DURATION[state.activeTW] || 720;
+      state.timeHours = (state.timeHours + 0.45 * state.speed) % mx;
+      const s = document.getElementById('globalTimeSlider'); if (s) s.value = state.timeHours;
+      updateUI();
+      animFrame = requestAnimationFrame(step);
+    };
+    animFrame = requestAnimationFrame(step);
+  } else if (animFrame) cancelAnimationFrame(animFrame);
+}
+
+function addCustomSite() {
+  const lat = parseFloat(document.getElementById('customLat').value);
+  const lon = parseFloat(document.getElementById('customLon').value);
+  const warn = document.getElementById('customWarn');
+
+  if (isNaN(lat) || lat < -90 || lat > -80) {
+    warn.textContent = '⚠ Lat must be [-90, -80]';
+    warn.classList.remove('hidden');
+    return;
+  }
+  if (isNaN(lon) || lon < -180 || lon > 180) {
+    warn.textContent = '⚠ Lon must be [-180, 180]';
+    warn.classList.remove('hidden');
+    return;
+  }
+
+  const name = document.getElementById('customName').value.trim() || `Site ${SITES.length + 1}`;
+  const nid = 'custom_' + Date.now();
+
+  const horizonBase = 1.2 + Math.abs(Math.sin(lat * 0.2)) * 2.0;
+  const ridgeAz = ((lon * 5 + 180) % 360 + 360) % 360;
+  const ridgeHeight = 2.5 + Math.abs(Math.cos(lat * 0.3 + lon * 0.05)) * 4.0;
+
+  SITE_BASE[nid] = {
+    lat, lon,
+    slopeDeg: 4.8,
+    psrDistanceKm: 1.5,
+    obstacleDensity: 'MED',
+    horizonBase,
+    ridgeAz,
+    ridgeHeight,
+    snrBase: 15.5,
+    riskLevel: 'med',
+    desc: `Custom landing site (${lat.toFixed(2)}°S, ${lon.toFixed(2)}°E). Safeness interpolated.`
+  };
+
+  SITES.push(makeSite(nid, name));
+
+  for (const tw of TWS) {
+    const dur = TW_DURATION[tw], eT = findEclipseHourForSite(SITES[SITES.length - 1], tw);
+    let ps = 0, cs = 0, ec = 0, mi = 0, cur = 0, n = 0, t = 0;
+    while (t <= dur) {
+      const k = computeSkyState(SITES[SITES.length - 1], tw, t);
+      if (k.sunFactor > 0.05) { ps++; cur = 0; }
+      else { cur += 1; if (cur > mi) mi = cur; }
+      if (k.commActive) cs++;
+      if (k.isEclipse) ec += 1;
+      n++;
+      t += 1;
+    }
+    PRECOMPUTED[nid + '-' + tw] = {
+      powerPct: ps / n * 100,
+      commPct: cs / n * 100,
+      eclipseHours: ec,
+      maxIlluminationInterruption: mi
+    };
+  }
+
+  state.selectedSiteId = nid;
+  warn.classList.remove('hidden');
+  warn.textContent = '✓ Custom site pinned to 3D Crater Bowl & 2D Map';
+  updateUI();
+}
+
+/* ============================================================================
+   MODULE C & C.1 — 30-Day Telemetry Data + Canvas Renderer
+   ============================================================================ */
+let telemetryCache = { key: '', points: [], lastCanvasKey: '' };
+let telemetryStaticLayer = null;
+
+function parseTelemetry(raw) {
+  if (!raw) return null;
+  if (Array.isArray(raw)) {
+    return raw.map(h => ({
+      hour: h.hour ?? h.h ?? h.time_h ?? h.t_h ?? h.t ?? 0,
+      soc: h.battery_soc_pct ?? h.battery_soc ?? h.soc ?? h.battery_pct ?? 100,
+      snr: h.snr_db ?? h.snr ?? h.signal_db ?? -10
+    })).filter(p => typeof p.hour === 'number');
+  }
+  if (raw.hours && Array.isArray(raw.hours)) {
+    return raw.hours.map((h, i) => ({
+      hour: h,
+      soc: raw.battery_soc_pct?.[i] ?? raw.soc?.[i] ?? raw.battery_pct?.[i] ?? 100,
+      snr: raw.snr_db?.[i] ?? raw.snr?.[i] ?? -10
+    }));
+  }
+  return null;
+}
+
+function getTelemetryPoints() {
+  const site = getSite();
+  const key = site.id + '-' + state.activeTW + '-' + (API.live ? 'live' : 'local');
+  if (telemetryCache.key === key && telemetryCache.points.length > 0) {
+    return telemetryCache.points;
+  }
+
+  // 1. API 优先
+  const api = getApiResult(site.id, state.activeTW);
+  if (api) {
+    const parsed = parseTelemetry(api.hourly_telemetry);
+    if (parsed && parsed.length > 1) {
+      telemetryCache = { key, points: parsed, lastCanvasKey: '' };
+      return parsed;
+    }
+  }
+
+  // 2. 本地兜底 (Module C.1 Minor 2 修复版)：净充电速率 = 太阳能发电 - 通信开销 - 日食惩罚
+  const dur = TW_DURATION[state.activeTW] || 720;
+  const step = 2;
+  const points = [];
+  let soc = 100;
+  for (let t = 0; t <= dur; t += step) {
+    const sky = computeSkyState(site, state.activeTW, t);
+    let rate = 0;                                // %/hour
+    if (sky.sunFactor > 0.5) rate += 0.45;       // 满光照充电
+    else if (sky.sunFactor > 0) rate += 0.15;    // 半影微充
+    if (sky.commActive) rate -= 0.18;            // 通信开销
+    else rate -= 0.55;                           // 通信中断，着陆器进入待机 + 加热
+    if (sky.isEclipse) rate -= 0.35;             // 日食额外：失去光照、无法充电
+    soc = Math.max(0, Math.min(100, soc + rate * step));
+    const snr = sky.commActive ? Math.max(0, (sky.qComm / 100) * 35 - 10) : -10;
+    points.push({ hour: t, soc, snr });
+  }
+  telemetryCache = { key, points, lastCanvasKey: '' };
+  return points;
+}
+
+function drawTelemetryStatic(ctx, W, H, points) {
+  const dur = TW_DURATION[state.activeTW] || 720;
+  const padL = 42, padR = 42, padT = 10, padB = 18;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  if (plotW < 60 || plotH < 20) return;   // ★ Module C.1 Minor 3: 极窄屏保护
+
+  // 背景
+  ctx.fillStyle = '#02040a';
+  ctx.fillRect(0, 0, W, H);
+
+  // 水平网格
+  ctx.strokeStyle = 'rgba(34,211,238,0.08)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (i / 4) * plotH;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+  }
+
+  // 垂直网格（每 5 天）
+  ctx.font = '9px ui-monospace';
+  ctx.textAlign = 'center';
+  for (let d = 0; d <= dur; d += 120) {
+    const x = padL + (d / dur) * plotW;
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH);
+    ctx.strokeStyle = 'rgba(34,211,238,0.12)'; ctx.stroke();
+    ctx.fillStyle = 'rgba(148,163,184,0.65)';
+    ctx.fillText('D' + (Math.round(d / 24) + 1), x, H - 4);
+  }
+
+  // Y 轴标签 — 左：Battery SOC
+  ctx.textAlign = 'right';
+  ctx.font = '9px ui-monospace';
+  ['100%', '50%', '0%'].forEach((lbl, i) => {
+    const y = padT + (i / 2) * plotH;
+    ctx.fillStyle = '#c084fc';
+    ctx.fillText(lbl, padL - 4, y + 3);
+  });
+  // Y 轴标签 — 右：SNR
+  ctx.textAlign = 'left';
+  ['25dB', '7.5dB', '-10dB'].forEach((lbl, i) => {
+    const y = padT + (i / 2) * plotH;
+    ctx.fillStyle = '#22d3ee';
+    ctx.fillText(lbl, padL + plotW + 4, y + 3);
+  });
+
+  // ── Battery SOC 曲线（紫）+ 渐变填充 ──
+  const toXSOC = h => padL + (h / dur) * plotW;
+  const toYSOC = v => padT + (1 - v / 100) * plotH;
+
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    const x = toXSOC(p.hour), y = toYSOC(p.soc);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#c084fc';
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+
+  // 填充区域
+  ctx.lineTo(toXSOC(points[points.length - 1].hour), padT + plotH);
+  ctx.lineTo(toXSOC(points[0].hour), padT + plotH);
+  ctx.closePath();
+  const gfill = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+  gfill.addColorStop(0, 'rgba(192,132,252,0.35)');
+  gfill.addColorStop(1, 'rgba(192,132,252,0.02)');
+  ctx.fillStyle = gfill;
+  ctx.fill();
+
+  // ── SNR 曲线（青虚线）──
+  const toYSNR = v => padT + (1 - (Math.max(-10, Math.min(25, v)) + 10) / 35) * plotH;
+  ctx.beginPath();
+  ctx.setLineDash([4, 3]);
+  points.forEach((p, i) => {
+    const x = toXSOC(p.hour), y = toYSNR(p.snr);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#22d3ee';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 底部时间轴标注（Module C.1 Minor 1 修复：避免和 D31 重叠）
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(148,163,184,0.5)';
+  ctx.font = '8px ui-monospace';
+  ctx.fillText('0h', padL, H - 4);
+  ctx.fillText(dur + 'h', padL + plotW - 10, H - 4);
+
+  // 标签
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#c084fc';
+  ctx.font = 'bold 9px ui-monospace';
+  ctx.fillText('BATTERY', padL + 4, padT + 10);
+  ctx.fillStyle = '#22d3ee';
+  ctx.textAlign = 'right';
+  ctx.fillText('SNR', padL + plotW - 4, padT + 10);
+}
+
+function renderTelemetryChart() {
+  const canvas = document.getElementById('telemetryCanvas');
+  if (!canvas || state.mode !== 'planner') return;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
+
+  const W = rect.width, H = rect.height;
+  const dpr = window.devicePixelRatio || 1;
+  const points = getTelemetryPoints();
+  if (points.length === 0) return;
+
+  const staticKey = telemetryCache.key + '|' + Math.round(W) + 'x' + Math.round(H);
+  if (telemetryCache.lastCanvasKey !== staticKey || !telemetryStaticLayer) {
+    telemetryStaticLayer = document.createElement('canvas');
+    telemetryStaticLayer.width = W * dpr;
+    telemetryStaticLayer.height = H * dpr;
+    const sctx = telemetryStaticLayer.getContext('2d');
+    sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawTelemetryStatic(sctx, W, H, points);
+    telemetryCache.lastCanvasKey = staticKey;
+  }
+
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.drawImage(telemetryStaticLayer, 0, 0, W, H);
+
+  const dur = TW_DURATION[state.activeTW] || 720;
+  const padL = 42, padR = 42, padT = 10, padB = 18;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const cursorX = padL + (state.timeHours / dur) * plotW;
+
+  ctx.beginPath();
+  ctx.moveTo(cursorX, padT);
+  ctx.lineTo(cursorX, padT + plotH);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = '#ffffff';
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  const curPoint = points.reduce((best, p) =>
+    Math.abs(p.hour - state.timeHours) < Math.abs(best.hour - state.timeHours) ? p : best, points[0]);
+  ctx.fillStyle = 'rgba(5,9,20,0.92)';
+  ctx.strokeStyle = '#22d3ee';
+  ctx.lineWidth = 1;
+  const bubW = 78, bubH = 16;
+  const bubX = Math.max(padL, Math.min(padL + plotW - bubW, cursorX - bubW / 2));
+  ctx.fillRect(bubX, padT - 2, bubW, bubH);
+  ctx.strokeRect(bubX, padT - 2, bubW, bubH);
+  ctx.fillStyle = '#67e8f9';
+  ctx.font = 'bold 9px ui-monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`SOC ${curPoint.soc.toFixed(0)}% · ${curPoint.snr.toFixed(1)}dB`, bubX + bubW / 2, padT + 9);
+}
+
+function renderGanttBar() {
+  const inner = document.getElementById('ganttInner');
+  if (!inner) return;
+  const dur = TW_DURATION[state.activeTW] || 720;
+  const site = getSite();
+  const hash = site.id + '-' + state.activeTW + '-' + (API.live ? 'live' : 'local') + '-' + dur;
+  if (inner.dataset.hash === hash) return;
+  inner.dataset.hash = hash;
+
+  let html = '';
+  if (API.live) {
+    const api = getApiResult(site.id, state.activeTW);
+    if (api && Array.isArray(api.timeline) && api.timeline.length > 0) {
+      const cmap = { FULLY_LIT: '#eab308', PARTIAL_SHADOW: '#a16207', FULL_SHADOW: '#1e293b' };
+      api.timeline.forEach(t => {
+        const w = ((t.end_h - t.start_h) / dur) * 100;
+        if (w <= 0) return;
+        const col = t.is_eclipse ? '#a855f7' : (cmap[t.solar_power] || '#1e293b');
+        html += `<div class="gantt-seg" style="width:${w.toFixed(4)}%;background:${col}"></div>`;
+      });
+      inner.innerHTML = html;
+      return;
+    }
+  }
+
+  for (let t = 0; t < dur; t += 4) {
+    const sky = computeSkyState(site, state.activeTW, t);
+    let col;
+    if (sky.isEclipse) col = '#a855f7';
+    else if (sky.sunFactor > 0.5) col = '#eab308';
+    else if (sky.sunFactor > 0) col = '#a16207';
+    else col = '#1e293b';
+    const segW = (Math.min(4, dur - t) / dur) * 100;
+    html += `<div class="gantt-seg" style="width:${segW.toFixed(4)}%;background:${col}"></div>`;
+  }
+  inner.innerHTML = html;
+}
+
+/* ============================================================================
+   INIT & RESIZE
+   ============================================================================ */
+window.addEventListener('load', () => {
+  const sp = document.getElementById('playSpeed');
+  if (sp) sp.addEventListener('change', e => state.speed = parseFloat(e.target.value));
+  selectPresetCase('eclipse_case');
+  setTimeout(() => connectApi(), 500);
+});
+
+window.addEventListener('resize', () => {
+  if (moon3DRenderer) {
+    const c = document.getElementById('moon3DContainer');
+    if (c && c.clientWidth > 0) {
+      moon3DRenderer.setSize(c.clientWidth, c.clientHeight);
+      moon3DCam.aspect = c.clientWidth / c.clientHeight;
+      moon3DCam.updateProjectionMatrix();
+    }
+  }
+  updateUI();
+});
+</script>
+</body>
+</html>
+
