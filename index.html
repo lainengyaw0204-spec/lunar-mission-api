@@ -7,7 +7,32 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
-  * { box-sizing: border-box; }
+ /* === B-3 色盲模式基建 (CSS 变量) === */
+  :root {
+    --c-safe: #a855f7;       /* Normal: Purple */
+    --c-power: #facc15;      /* Normal: Yellow */
+    --c-comm: #06b6d4;       /* Normal: Cyan */
+    --c-risk-low: #10b981;   /* Normal: Emerald */
+    --c-risk-med: #eab308;   /* Normal: Amber */
+    --c-risk-high: #ef4444;  /* Normal: Red */
+  }
+  body[data-theme="colorblind"] {
+    --c-safe: #CC78BC;       /* Colorblind: Pink/Purple */
+    --c-power: #DE8F05;      /* Colorblind: Orange */
+    --c-comm: #0173B2;       /* Colorblind: Blue */
+    --c-risk-low: #029E73;   /* Colorblind: Green */
+    --c-risk-med: #DE8F05;   
+    --c-risk-high: #D55E00;  
+  }
+  body[data-theme="high-contrast"] {
+    --c-safe: #ffffff;
+    --c-power: #ffff00;
+    --c-comm: #00ffff;
+    --c-risk-low: #ffffff;
+    --c-risk-med: #ffff00;
+    --c-risk-high: #ff0000;
+  }
+ * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; background: #050914; color: #cbd5e1;
     font-family: ui-monospace, 'JetBrains Mono', 'Fira Code', SFMono-Regular, Menlo, Consolas, monospace;
@@ -191,7 +216,30 @@
     <button onclick="toggleOrbitModal(true)" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400/60 text-purple-200 hover:bg-purple-500/35 font-bold">🌌 3D ORBIT</button>
   </div>
 </header>
+<!-- B-4 信息深度 & B-3 色盲模式控制台 -->
+<div class="border-b border-cyan-500/20 bg-slate-900/80 px-4 py-1.5 flex justify-between items-center text-[10px] mono">
+  <div class="flex gap-2">
+    <span class="text-slate-500">INFO DEPTH:</span>
+    <button onclick="Store.setState({depth: 'L1'})" class="text-cyan-400 hover:text-white">L1 (BASIC)</button>
+    <button onclick="Store.setState({depth: 'L2'})" class="text-cyan-400 hover:text-white font-bold border-b border-cyan-400">L2 (NOMINAL)</button>
+    <button onclick="Store.setState({depth: 'L3'})" class="text-cyan-400 hover:text-white">L3 (EXPERT)</button>
+  </div>
+  <div class="flex gap-2">
+    <span class="text-slate-500">VISUAL:</span>
+    <button onclick="document.body.dataset.theme='normal'; Store.setState({theme: 'normal'})" class="text-slate-300 hover:text-white">NORMAL</button>
+    <button onclick="document.body.dataset.theme='colorblind'; Store.setState({theme: 'colorblind'})" class="text-slate-300 hover:text-white">COLORBLIND</button>
+  </div>
+</div>
 
+<!-- B-2 Data Provenance 抽屉 (默认隐藏) -->
+<div id="provenanceDrawer" class="fixed right-0 top-0 bottom-0 w-80 bg-slate-950/95 border-l border-cyan-500/30 z-50 transform translate-x-full transition-transform duration-300 p-4 overflow-y-auto hidden">
+  <h2 class="text-cyan-400 font-bold tracking-widest text-xs mb-4">📊 DATA PROVENANCE</h2>
+  <div class="text-red-400 text-[10px] border border-red-500/30 bg-red-500/10 p-2 rounded mb-4">
+    ⚠ <strong>WHAT THIS IS NOT:</strong> Not a flight-certified link budget. Not engineering-grade hazard detection.
+  </div>
+  <!-- 抽屉内容由 JS 注入 -->
+  <button onclick="document.getElementById('provenanceDrawer').classList.add('translate-x-full')" class="mt-4 px-3 py-1 bg-slate-800 text-slate-300 rounded text-xs">Close</button>
+</div>
 <!-- PLANNER VIEW -->
 <div id="viewPlanner" class="view">
 
@@ -208,7 +256,7 @@
       <div class="panel-title">◈ SCENARIO PRESETS</div>
       <div class="flex flex-col gap-1.5">
         <button onclick="selectPresetCase('good_both')" class="text-left px-2.5 py-1.5 rounded border border-emerald-500/35 bg-emerald-500/10 text-emerald-300 text-[11px] hover:bg-emerald-500/20 font-semibold">🟢 BEST: Sun + Comm (Malapert)</button>
-        <button onclick="selectPresetCase('eclipse_case')" class="text-left px-2.5 py-1.5 rounded border border-purple-500/50 bg-purple-500/15 text-purple-200 text-[11px] hover:bg-purple-500/25 font-semibold">🟣 EARTH OCCULTATION (Gerlache)</button>
+        <button onclick="selectPresetCase('occultation_case')" class="text-left px-2.5 py-1.5 rounded border border-purple-500/50 bg-purple-500/15 text-purple-200 text-[11px] hover:bg-purple-500/25 font-semibold">🟣 EARTH OCCULTATION (Gerlache)</button>
         <button onclick="selectPresetCase('bad_both')" class="text-left px-2.5 py-1.5 rounded border border-red-500/35 bg-red-500/10 text-red-300 text-[11px] hover:bg-red-500/20 font-semibold">🔴 HIGH RISK: Crater Rim (Shackleton)</button>
       </div>
     </div>
@@ -511,6 +559,52 @@ const SITE_BASE = {
 };
 const SITE_NAME_MAP = { gerlache: 'de Gerlache Rim 2', malapert: 'Malapert Massif', shackleton: 'Shackleton Rim', nobile: 'Nobile Rim 2' };
 
+ /* ============================================================================
+   P1-A CORE: Minimal Store & Pub/Sub
+   ============================================================================ */
+const Store = (function() {
+  let state = {
+    mode: 'planner',
+    moonView: '3d',
+    selectedSiteIds: ['gerlache'], // 改为数组以支持 B-5 多选
+    activeTW: 'TW-1',
+    timeHours: 216,
+    playing: false,
+    speed: 1,
+    theme: 'normal',   // B-3: normal | colorblind | high-contrast
+    depth: 'L2'        // B-4: L1 | L2 | L3
+  };
+  const listeners = new Set();
+  let rafId = null;
+
+  return {
+    getState: () => ({ ...state }),
+    setState: (updates) => {
+      let changed = false;
+      for (const k in updates) {
+        if (state[k] !== updates[k]) { state[k] = updates[k]; changed = true; }
+      }
+      if (!changed) return;
+      
+      // 差异化节流：timeHours 使用 rAF 覆写，其余立刻派发
+      if ('timeHours' in updates) {
+        if (!rafId) {
+          rafId = requestAnimationFrame(() => {
+            listeners.forEach(fn => fn(state));
+            rafId = null;
+          });
+        }
+      } else {
+        listeners.forEach(fn => fn(state));
+      }
+    },
+    subscribe: (fn) => {
+      listeners.add(fn);
+      // 防泄漏：返回 unsubscribe
+      return () => listeners.delete(fn);
+    }
+  };
+})();
 function makeSite(id, name) {
   return {
     id,
@@ -591,7 +685,7 @@ function angularSep(az1, el1, az2, el2) {
   const c = Math.sin(e1) * Math.sin(e2) + Math.cos(e1) * Math.cos(e2) * Math.cos(a1 - a2);
   return Math.acos(Math.max(-1, Math.min(1, c))) * 180 / Math.PI;
 }
-function partialEclipseFrac(sep, Re, Rs) {
+function partialOccultationFrac(sep, Re, Rs) {
   if (sep >= Re + Rs) return 1;
   if (sep <= Math.abs(Re - Rs)) return Re >= Rs ? 0 : 1 - Math.pow(Re / Rs, 2);
   const A = Math.acos((sep * sep + Rs * Rs - Re * Re) / (2 * sep * Rs));
@@ -639,7 +733,7 @@ function computeSkyState(site, twId, tLocal) {
   const isEarthOccultation = earthOK && sep < PHYS.earthAngRadDeg + PHYS.sunAngRadDeg;
   let sunFactor;
   if (!sunOK) sunFactor = 0;
-  else if (isEarthOccultation) sunFactor = partialEclipseFrac(sep, PHYS.earthAngRadDeg, PHYS.sunAngRadDeg);
+  else if (isEarthOccultation) sunFactor = partialOccultationFrac(sep, PHYS.earthAngRadDeg, PHYS.sunAngRadDeg);
   else sunFactor = 1;
   const commActive = earthOK;
   const qComm = commActive ? computeQComm(site, earthEl, maskAtEarth) : 0;
@@ -923,10 +1017,10 @@ function findOccultationHourForSite(site, twId) {
   occultationCache[key] = fine;
   return fine;
 }
-let globalEclipseT = null;
-function getGlobalEclipseHour() {
-  if (globalEclipseT === null) globalEclipseT = findOccultationHourForSite(SITES.find(s => s.id === 'malapert'), 'TW-1');
-  return globalEclipseT;
+let globalOccultationT = null;
+function getGlobalOccultationHour() {
+  if (globalOccultationT === null) globalOccultationT = findOccultationHourForSite(SITES.find(s => s.id === 'malapert'), 'TW-1');
+  return globalOccultationT;
 }
 const PRECOMPUTED = (function () {
   const out = {};
@@ -942,7 +1036,7 @@ const PRECOMPUTED = (function () {
       n++; t += near ? 0.25 : 1;
     }
     mi = Math.max(mi, cur);
-    out[site.id + '-' + tw] = { powerPct: ps / n * 100, commPct: cs / n * 100, eclipseHours: ec, maxIlluminationInterruption: mi };
+    out[site.id + '-' + tw] = { powerPct: ps / n * 100, commPct: cs / n * 100, occultationHours: ec, maxIlluminationInterruption: mi };
   }
   return out;
 })();
@@ -1248,14 +1342,22 @@ function renderPOVCanvas(canvas, viewMode) {
     ctx.fillText(`▲ Ridge +${maxPeakEl.toFixed(1)}°`, maxPeakX, Math.max(14, maxPeakY - 6));
   }
 }
-// --- 新增: 倒计时 UI ---
+/* ============================================================================
+   独立封装：倒计时 UI 渲染 (修复悬空逻辑与 P0 语法错误)
+   ============================================================================ */
+function drawCountdown(ctx, W, site, targetType, sky, api, state) {
   let timeText = '—';
-  const api = getApiResult(site.id, state.activeTW);
   const dur = TW_DURATION[state.activeTW] || 720;
   let nextT = state.timeHours;
 
+  // 动态读取 CSS 主题变量 (B-3 色盲模式支持)
+  const rootStyles = getComputedStyle(document.body);
+  const cPower = rootStyles.getPropertyValue('--c-power').trim() || '#fde047';
+  const cComm  = rootStyles.getPropertyValue('--c-comm').trim() || '#67e8f9';
+
   if (targetType === 'sun') {
-    if (api && api.summary && api.summary.typeof next_sunset_h === 'number' && sky.sunOK && !sky.isEarthOccultation) {
+    // 修复语法错误：严格校验 typeof api.summary.next_sunset_h === 'number'
+    if (api && api.summary && typeof api.summary.next_sunset_h === 'number' && sky.sunOK && !sky.isEarthOccultation) {
       const diff = api.summary.next_sunset_h;
       timeText = diff < 1 ? `Sunset in ${(diff * 60).toFixed(0)}m` : `Sunset in ${diff.toFixed(1)}h`;
     } else {
@@ -1269,11 +1371,10 @@ function renderPOVCanvas(canvas, viewMode) {
         timeText = diff < (dur - state.timeHours) ? (diff < 1 ? `In shadow for ${(diff*60).toFixed(0)}m more` : `In shadow for ${diff.toFixed(1)}h more`) : 'No upcoming sunrise';
       }
     }
-    ctx.fillStyle = '#fde047';
-    ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center';
-    ctx.fillText(timeText, W * 0.5, 20);
+    ctx.fillStyle = cPower;
   } else if (targetType === 'earth') {
-    if (api && api.summary && api.summary.typeof next_earthset_h === 'number' && sky.earthOK) {
+    // 修复语法错误：严格校验 typeof api.summary.next_earthset_h === 'number'
+    if (api && api.summary && typeof api.summary.next_earthset_h === 'number' && sky.earthOK) {
       const diff = api.summary.next_earthset_h;
       timeText = diff < 1 ? `Earthset in ${(diff * 60).toFixed(0)}m` : `Earthset in ${diff.toFixed(1)}h`;
     } else {
@@ -1287,10 +1388,237 @@ function renderPOVCanvas(canvas, viewMode) {
         timeText = diff < (dur - state.timeHours) ? (diff < 1 ? `Blocked for ${(diff*60).toFixed(0)}m more` : `Blocked for ${diff.toFixed(1)}h more`) : 'No upcoming earthrise';
       }
     }
-    ctx.fillStyle = '#67e8f9';
-    ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center';
-    ctx.fillText(timeText, W * 0.5, 20);
+    ctx.fillStyle = cComm;
   }
+  
+  ctx.font = 'bold 10px ui-monospace, monospace'; 
+  ctx.textAlign = 'center';
+  ctx.fillText(timeText, W * 0.5, 20);
+}
+
+
+/* ============================================================================
+   核心渲染：POV Canvas (支持色盲模式与解耦调用)
+   ============================================================================ */
+function renderPOVCanvas(canvas, viewMode) {
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
+  const dpr = window.devicePixelRatio || 1, W = rect.width, H = rect.height;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // 动态读取 CSS 主题变量 (B-3)
+  const rootStyles = getComputedStyle(document.body);
+  const cRiskHigh = rootStyles.getPropertyValue('--c-risk-high').trim() || '#ef4444';
+  const cPower    = rootStyles.getPropertyValue('--c-power').trim() || '#facc15';
+  const cComm     = rootStyles.getPropertyValue('--c-comm').trim() || '#22d3ee';
+
+  const site = getSite();
+  const sky = computeSkyState(site, state.activeTW, state.timeHours);
+  const targetType = viewMode || 'earth';
+  const targetAz = targetType === 'sun' ? sky.sunAz : sky.earthAz;
+  const relAzOf = az => {
+    let d = az - targetAz;
+    while (d > 180) d -= 360;
+    while (d < -180) d += 360;
+    return d;
+  };
+
+  const FOV = 65;
+  let minEl = Infinity, maxEl = -Infinity;
+  for (let az = targetAz - FOV; az <= targetAz + FOV; az += 0.5) {
+    const el = horizonAt(site.id, az);
+    if (el < minEl) minEl = el;
+    if (el > maxEl) maxEl = el;
+  }
+  const allMin = Math.min(minEl, sky.sunEl, sky.earthEl, -1);
+  const allMax = Math.max(maxEl, sky.sunEl, sky.earthEl, 8);
+  const span = Math.max(4.0, allMax - allMin);
+
+  const elToY = el => {
+    const norm = (el - allMin) / span;
+    return H * 0.95 - norm * (H * 0.90);
+  };
+
+  const relSun = relAzOf(sky.sunAz), sunX = W * 0.5 + (relSun / FOV) * (W * 0.46);
+  const relEarth = relAzOf(sky.earthAz), earthX = W * 0.5 + (relEarth / FOV) * (W * 0.46);
+  const sunY = elToY(sky.sunEl), earthY = elToY(sky.earthEl);
+  const earthR = Math.max(14, W * 0.028), sunR = Math.max(7, earthR * 0.42);
+
+  const sunOccluded = sky.sunEl <= sky.maskAtSun;
+  const earthOccluded = sky.earthEl <= sky.maskAtEarth;
+
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, H * 0.9);
+  if (sky.isEarthOccultation) {
+    skyGrad.addColorStop(0, '#050110');
+    skyGrad.addColorStop(0.55, '#1e0716');
+    skyGrad.addColorStop(1, '#3a0a1c');
+  } else {
+    skyGrad.addColorStop(0, '#000206');
+    skyGrad.addColorStop(0.7, '#050c18');
+    skyGrad.addColorStop(1, '#0e1626');
+  }
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  const rnd = mulberry32(7717);
+  ctx.fillStyle = 'rgba(226,232,240,0.75)';
+  for (let i = 0; i < 180; i++) {
+    const sx = rnd() * W, sy = rnd() * (H * 0.4), sz = rnd() < 0.82 ? 1.1 : 1.9;
+    ctx.fillRect(sx, sy, sz, sz);
+  }
+
+  // Sun 渲染
+  if (Math.abs(relSun) <= FOV + 5) {
+    if (sunOccluded && !sky.isEarthOccultation) {
+      ctx.globalAlpha = 0.2;
+      ctx.beginPath(); ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+      ctx.fillStyle = '#000000'; ctx.fill();
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = cRiskHigh; ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
+    } else if (!sky.isEarthOccultation) {
+      const sg = ctx.createRadialGradient(sunX, sunY, 1, sunX, sunY, sunR * 5.5);
+      sg.addColorStop(0, 'rgba(254, 240, 138, 0.98)');
+      sg.addColorStop(0.4, 'rgba(250, 204, 21, 0.42)');
+      sg.addColorStop(1, 'rgba(250, 204, 21, 0)');
+      ctx.fillStyle = sg;
+      ctx.beginPath(); ctx.arc(sunX, sunY, sunR * 5.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+      ctx.fillStyle = cPower; ctx.fill();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.stroke();
+    }
+  }
+
+  // Earth 渲染
+  if (Math.abs(relEarth) <= FOV + 5) {
+    if (earthOccluded && !sky.isEarthOccultation) {
+      ctx.globalAlpha = 0.2;
+      ctx.beginPath(); ctx.arc(earthX, earthY, earthR, 0, Math.PI * 2);
+      ctx.fillStyle = '#000000'; ctx.fill();
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = cRiskHigh; ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
+    } else if (sky.isEarthOccultation) {
+      const eg = ctx.createRadialGradient(earthX, earthY, earthR * 0.85, earthX, earthY, earthR * 2.8);
+      eg.addColorStop(0, 'rgba(251, 146, 60, 0.98)');
+      eg.addColorStop(0.45, 'rgba(239, 68, 68, 0.58)');
+      eg.addColorStop(1, 'rgba(239, 68, 68, 0)');
+      ctx.fillStyle = eg;
+      ctx.beginPath(); ctx.arc(earthX, earthY, earthR * 2.8, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(earthX, earthY, earthR, 0, Math.PI * 2);
+      ctx.fillStyle = '#070a12'; ctx.fill();
+      ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2.5; ctx.stroke();
+    } else {
+      const eg = ctx.createRadialGradient(earthX - earthR * 0.3, earthY - earthR * 0.3, earthR * 0.15, earthX, earthY, earthR);
+      eg.addColorStop(0, '#bae6fd');
+      eg.addColorStop(0.55, '#0284c7');
+      eg.addColorStop(1, '#082f49');
+      ctx.beginPath(); ctx.arc(earthX, earthY, earthR, 0, Math.PI * 2);
+      ctx.fillStyle = eg; ctx.fill();
+      ctx.strokeStyle = cComm; ctx.lineWidth = 1.2; ctx.stroke();
+    }
+  }
+
+  // 远端山脊
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for (let x = 0; x <= W; x += 3) {
+    const rel = ((x / W) - 0.5) * 130;
+    const el = horizonAt(site.id, targetAz + rel * 0.85 + 25) * 0.85 + minEl * 0.15;
+    ctx.lineTo(x, elToY(el));
+  }
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(10, 18, 32, 0.65)';
+  ctx.fill();
+
+  // 主山脊
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  const rockRnd = mulberry32(31337);
+  let maxPeakX = W / 2, maxPeakY = H / 2, maxPeakEl = -99;
+  for (let x = 0; x <= W; x += 1) {
+    const rel = ((x / W) - 0.5) * 130;
+    const el = horizonAt(site.id, targetAz + rel);
+    const rockNoise = (rockRnd() - 0.5) * 0.18;
+    const y = elToY(el + rockNoise);
+    if (el > maxPeakEl) { maxPeakEl = el; maxPeakX = x; maxPeakY = y; }
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W, H);
+  ctx.closePath();
+
+  const mtnGrad = ctx.createLinearGradient(0, H * 0.2, 0, H);
+  if (sky.isEarthOccultation) {
+    mtnGrad.addColorStop(0, '#2a0f1c');
+    mtnGrad.addColorStop(0.5, '#110608');
+    mtnGrad.addColorStop(1, '#020104');
+  } else if (sky.sunOK) {
+    mtnGrad.addColorStop(0, '#1e293b');
+    mtnGrad.addColorStop(0.45, '#0d1524');
+    mtnGrad.addColorStop(1, '#010409');
+  } else {
+    mtnGrad.addColorStop(0, '#0f172a');
+    mtnGrad.addColorStop(1, '#010205');
+  }
+  ctx.fillStyle = mtnGrad;
+  ctx.fill();
+
+  // 山脊线高亮
+  const crestColor = targetType === 'sun'
+    ? (sky.sunOK ? cPower : cRiskHigh)
+    : (sky.earthOK ? cComm : cRiskHigh);
+  
+  ctx.globalAlpha = 0.85;
+  ctx.strokeStyle = crestColor;
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+  ctx.globalAlpha = 1.0;
+
+  // 视线及文本标签
+  if (targetType === 'sun' && Math.abs(relSun) <= FOV) {
+    ctx.beginPath(); ctx.moveTo(W * 0.5, H * 0.98); ctx.lineTo(sunX, sunY);
+    ctx.strokeStyle = sunOccluded ? cRiskHigh : cPower;
+    ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+
+    ctx.fillStyle = sunOccluded ? cRiskHigh : cPower;
+    ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(
+      sky.isEarthOccultation ? '🌑 SUN OCCULTED BY EARTH'
+        : (sunOccluded ? `⚠ SUN OCCLUDED BY +${sky.maskAtSun.toFixed(1)}° RIDGE`
+                       : `☀️ SUN +${sky.sunEl.toFixed(1)}° CLEAR`),
+      sunX, Math.max(26, sunY - sunR - 8)
+    );
+  }
+
+  if (targetType === 'earth' && Math.abs(relEarth) <= FOV) {
+    ctx.beginPath(); ctx.moveTo(W * 0.5, H * 0.98); ctx.lineTo(earthX, earthY);
+    ctx.strokeStyle = earthOccluded ? cRiskHigh : cComm;
+    ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+
+    ctx.fillStyle = sky.isEarthOccultation ? '#fb923c' : (earthOccluded ? cRiskHigh : cComm);
+    ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(
+      sky.isEarthOccultation ? '🌍 EARTH CORONA · DTE 100%'
+        : (earthOccluded ? `⚠ EARTH OCCLUDED BY +${sky.maskAtEarth.toFixed(1)}° RIDGE`
+                         : `🌍 EARTH +${sky.earthEl.toFixed(1)}° CLEAR · DTE ACTIVE`),
+      earthX, Math.max(26, earthY - earthR - 8)
+    );
+  }
+
+  // 渲染山峰最高点标签
+  if (maxPeakEl > minEl + 1.5 && maxPeakX > 40 && maxPeakX < W - 40) {
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.75)';
+    ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(`▲ Ridge +${maxPeakEl.toFixed(1)}°`, maxPeakX, Math.max(14, maxPeakY - 6));
+  }
+
+  // 调用封装好的倒计时函数
+  drawCountdown(ctx, W, site, targetType, sky, getApiResult(site.id, state.activeTW), state);
+}
 /* ============================================================================
    7. REAL 3D CRATER BOWL TERRAIN MESH
    ============================================================================ */
@@ -2086,7 +2414,7 @@ function toggleOrbitModal(open) {
 function updateOrbitScene() {
   if (!orbitRenderer) return;
   const tAbs = (TW_T0[state.activeTW] || 0) + state.timeHours;
-  const geAbs = (TW_T0['TW-1'] || 0) + getGlobalEclipseHour();
+  const geAbs = (TW_T0['TW-1'] || 0) + getGlobalOccultationHour();
   const ang = ((tAbs - geAbs) / PHYS.synodicHours) * Math.PI * 2;
   const rO = 9.5, inc = PHYS.lunarInclinationDeg * Math.PI / 180;
 
@@ -2190,7 +2518,7 @@ function updateUI() {
 }
 
 function selectPresetCase(key) {
-  if (key === 'eclipse_case') {
+  if (key === 'occultation_case') {
     state.activeTW = 'TW-1';
     state.selectedSiteId = 'gerlache';
     state.timeHours = findOccultationHourForSite(SITES.find(s => s.id === 'gerlache'), 'TW-1');
@@ -2291,7 +2619,7 @@ function addCustomSite() {
     PRECOMPUTED[nid + '-' + tw] = {
       powerPct: ps / n * 100,
       commPct: cs / n * 100,
-      eclipseHours: ec,
+      occultationHours: ec,
       maxIlluminationInterruption: mi
     };
   }
@@ -2567,7 +2895,7 @@ function renderGanttBar() {
 window.addEventListener('load', () => {
   const sp = document.getElementById('playSpeed');
   if (sp) sp.addEventListener('change', e => state.speed = parseFloat(e.target.value));
-  selectPresetCase('eclipse_case');
+  selectPresetCase('occultation_case');
   setTimeout(() => connectApi(), 500);
 });
 
