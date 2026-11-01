@@ -1255,7 +1255,7 @@ function renderPOVCanvas(canvas, viewMode) {
   let nextT = state.timeHours;
 
   if (targetType === 'sun') {
-    if (api && api.summary && api.summary.next_sunset_h !== undefined && sky.sunOK && !sky.isEarthOccultation) {
+    if (api && api.summary && api.summary.typeof next_sunset_h === 'number' && sky.sunOK && !sky.isEarthOccultation) {
       const diff = api.summary.next_sunset_h;
       timeText = diff < 1 ? `Sunset in ${(diff * 60).toFixed(0)}m` : `Sunset in ${diff.toFixed(1)}h`;
     } else {
@@ -1273,7 +1273,7 @@ function renderPOVCanvas(canvas, viewMode) {
     ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center';
     ctx.fillText(timeText, W * 0.5, 20);
   } else if (targetType === 'earth') {
-    if (api && api.summary && api.summary.next_earthset_h !== undefined && sky.earthOK) {
+    if (api && api.summary && api.summary.typeof next_earthset_h === 'number' && sky.earthOK) {
       const diff = api.summary.next_earthset_h;
       timeText = diff < 1 ? `Earthset in ${(diff * 60).toFixed(0)}m` : `Earthset in ${diff.toFixed(1)}h`;
     } else {
@@ -1701,7 +1701,7 @@ document.getElementById('scoreName').textContent = site.name;
 
   const sunSt = document.getElementById('povSunStatus');
   if (sunSt) {
-    sunSt.textContent = sky.isEarthOccultation ? '🌑 ECLIPSE (0%)' : (sky.sunOK ? '✓ SUNLIT' : '⚠ TERRAIN SHADOW');
+    sunSt.textContent = sky.isEarthOccultation ? '🌑 EARTH OCCULTATION (0%)' : (sky.sunOK ? '✓ SUNLIT' : '⚠ TERRAIN SHADOW');
     sunSt.className = sky.isEarthOccultation ? 'text-[10px] mono text-purple-300 font-bold' : (sky.sunOK ? 'text-[10px] mono text-emerald-300' : 'text-[10px] mono text-red-400');
   }
   const earthSt = document.getElementById('povEarthStatus');
