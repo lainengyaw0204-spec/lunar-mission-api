@@ -98,7 +98,7 @@
   .score-circle.safe { border-color: #a855f7; }
   .score-circle.safe .val { color: #c084fc; }
 
-  .eclipse-callout { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(88,28,135,0.88); backdrop-filter: blur(18px); border: 2px solid #a855f7; border-radius: 14px; padding: 20px 28px; text-align: center; box-shadow: 0 0 50px rgba(168,85,247,0.65); z-index: 20; }
+  .occultation-callout { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(88,28,135,0.88); backdrop-filter: blur(18px); border: 2px solid #a855f7; border-radius: 14px; padding: 20px 28px; text-align: center; box-shadow: 0 0 50px rgba(168,85,247,0.65); z-index: 20; }
   .pulse-red { animation: pulseRed 1.2s infinite; }
   @keyframes pulseRed { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
   .number-glow { text-shadow: 0 0 12px currentColor; }
@@ -418,7 +418,7 @@
       </div>
       <div class="flex-1 relative rounded overflow-hidden bg-black" style="min-height:0">
         <canvas id="povEducator" class="w-full h-full"></canvas>
-        <div id="eclipseCalloutEdu" class="eclipse-callout hidden pointer-events-none"></div>
+        <div id="occultationCalloutEdu" class="occultation-callout hidden pointer-events-none"></div>
       </div>
     </div>
   </div>
@@ -1803,7 +1803,7 @@ function renderEducatorRight() {
   const html = steps.map(s => `<div class="edu-step ${s.cls}"><div class="edu-step-title" style="color: ${s.cls === 'what' ? '#22d3ee' : s.cls === 'why' ? '#a855f7' : '#facc15'}">${s.title}</div><div class="edu-step-body">${s.body}</div></div>`).join('');
   const eduExplain = document.getElementById('eduExplain'); if (eduExplain) { eduExplain.classList.remove('text-[12px]', 'leading-relaxed'); eduExplain.innerHTML = html; }
 
-  const callout = document.getElementById('eclipseCalloutEdu');
+  const callout = document.getElementById('occultationCalloutEdu');
   if (callout) {
     if (sky.isEarthOccultation) {
       callout.classList.remove('hidden');
