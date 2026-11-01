@@ -402,7 +402,7 @@
   <div class="flex items-center gap-2 flex-wrap">
     <div class="m-planner-flex items-center gap-2">
       <button id="playPauseBtn" onclick="togglePlay()" class="px-3 py-1 rounded bg-cyan-500/20 border border-cyan-400 text-cyan-300 text-[12px] font-bold hover:bg-cyan-500/35">▶ PLAY</button>
-      <button onclick="triggerOccultationMoment()" title="Jump to Solar Eclipse" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px] font-bold hover:bg-purple-500/35">🌑 ECLIPSE</button>
+      <button onclick="triggerOccultationMoment()" title="Jump to Earth Occultation" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px] font-bold hover:bg-purple-500/35">🌑 OCCULTATION</button>
       <select id="playSpeed" class="bg-slate-900 border border-slate-700 text-cyan-300 text-[11px] rounded px-1.5 py-1 mono">
         <option value="0.5">0.5×</option>
         <option value="1" selected>1.0×</option>
@@ -456,10 +456,10 @@
     <div class="flex items-center justify-between px-4 py-2.5 border-b border-slate-700/60">
       <div>
         <div class="text-xs font-bold text-cyan-400 tracking-widest">3D SUN–EARTH–MOON · J2000 INERTIAL SANDBOX</div>
-        <div class="text-[10px] text-slate-400">Drag to rotate · Scroll to zoom · Purple cone = Earth Umbra (Eclipse Shadow Zone)</div>
+        <div class="text-[10px] text-slate-400">Drag to rotate · Scroll to zoom · Purple cone = Earth Umbra (Occultation Shadow Zone)</div>
       </div>
       <div class="flex items-center gap-2">
-        <button onclick="triggerOccultationMoment(); updateOrbitScene();" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px]">🌑 Snap to Eclipse Alignment</button>
+        <button onclick="triggerOccultationMoment(); updateOrbitScene();" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px]">🌑 Snap to Occultation Alignment</button>
         <button onclick="toggleOrbitModal(false)" class="px-2.5 py-1 rounded bg-slate-800 border border-slate-600 text-slate-300 text-[11px] hover:bg-slate-700">✕ CLOSE</button>
       </div>
     </div>
@@ -1837,7 +1837,7 @@ function renderEducatorRight() {
       callout.innerHTML = `
         <div class="text-3xl mb-1">🌑</div>
         <div class="text-lg font-bold text-purple-200 tracking-wider">EARTH OCCULTATION</div>
-        <div class="text-xs text-slate-300 mb-2">EARTH OCCULTATIONs the Sun</div>
+        <div class="text-xs text-slate-300 mb-2">Earth Occults the Sun</div>
         <div class="grid grid-cols-2 gap-3 text-center text-xs mono">
           <div><div class="text-slate-400 text-[9px]">SOLAR POWER</div><div class="text-red-400 text-base font-bold">0%</div></div>
           <div><div class="text-slate-400 text-[9px]">EARTH COMM</div><div class="text-cyan-300 text-base font-bold">100%</div></div>
