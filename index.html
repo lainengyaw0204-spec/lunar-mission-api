@@ -592,32 +592,21 @@ const Store = (function() {
     depth: 'L2'        // B-4: L1 | L2 | L3
   };
   const listeners = new Set();
-  let rafId = null;
 
   return {
-    getState: () => ({ ...state }),
+    getState: () => ({ ...state, selectedSiteIds: [...state.selectedSiteIds] }),
     setState: (updates) => {
       let changed = false;
       for (const k in updates) {
         if (state[k] !== updates[k]) { state[k] = updates[k]; changed = true; }
       }
       if (!changed) return;
-      
-      // 差异化节流：timeHours 使用 rAF 覆写，其余立刻派发
-      if ('timeHours' in updates) {
-        if (!rafId) {
-          rafId = requestAnimationFrame(() => {
-            listeners.forEach(fn => fn(state));
-            rafId = null;
-          });
-        }
-      } else {
-        listeners.forEach(fn => fn(state));
-      }
+      // 每次派发独立浅拷贝快照，彻底杜绝外部监听器引用污染
+      const snapshot = { ...state, selectedSiteIds: [...state.selectedSiteIds] };
+      listeners.forEach(fn => fn(snapshot));
     },
     subscribe: (fn) => {
       listeners.add(fn);
-      // 防泄漏：返回 unsubscribe
       return () => listeners.delete(fn);
     }
   };
@@ -1286,8 +1275,8 @@ function renderPOVCanvas(canvas, viewMode, renderSite) {
     }
   }
 
-  ctx.beginPath(); ctx.moveTo(0, H);
-  for (let x = 0; x <= W; x += 3) {
+ ctx.beginPath(); ctx.moveTo(0, H);
+  for (let x = 0; x <= W; x += 4) {
     const rel = ((x / W) - 0.5) * 130;
     const el = horizonAt(renderSite.id, targetAz + rel * 0.85 + 25) * 0.85 + minEl * 0.15;
     ctx.lineTo(x, elToY(el));
@@ -1297,7 +1286,7 @@ function renderPOVCanvas(canvas, viewMode, renderSite) {
   ctx.beginPath(); ctx.moveTo(0, H);
   const rockRnd = mulberry32(31337);
   let maxPeakX = W / 2, maxPeakY = H / 2, maxPeakEl = -99;
-  for (let x = 0; x <= W; x += 1) {
+  for (let x = 0; x <= W; x += 2) {
     const rel = ((x / W) - 0.5) * 130;
     const el = horizonAt(renderSite.id, targetAz + rel);
     const rockNoise = (rockRnd() - 0.5) * 0.18;
@@ -1514,13 +1503,25 @@ function updateMoon3DTerrain() {
 }
 
 function setMoonView(moonView) {
-  Store.setState({ moonView });
+  // 先切换 DOM 显隐与按钮样式，确保容器拥有真实宽高后再通知 Store 重绘
   document.getElementById('moon2DCanvas').classList.toggle('hidden', moonView !== '2d');
   document.getElementById('moon3DContainer').classList.toggle('hidden', moonView !== '3d');
   document.getElementById('btnMoon2D').className = moonView === '2d' ? 'view-btn on' : 'view-btn off';
   document.getElementById('btnMoon3D').className = moonView === '3d' ? 'view-btn on' : 'view-btn off';
-}
+  Store.setState({ moonView });
 
+  requestAnimationFrame(() => {
+    if (moonView === '2d') drawMoon2DMapPlanner();
+    else if (moon3DRenderer) {
+      const c = document.getElementById('moon3DContainer');
+      if (c && c.clientWidth > 0) {
+        moon3DRenderer.setSize(c.clientWidth, c.clientHeight);
+        moon3DCam.aspect = c.clientWidth / c.clientHeight;
+        moon3DCam.updateProjectionMatrix();
+      }
+    }
+  });
+}
 function drawHorizonRadar(canvas, peakLabelEl) {
   if (!canvas) return;
   const { activeTW, timeHours } = Store.getState();
@@ -1914,9 +1915,16 @@ function renderFooter() {
     else { phase.textContent = '🟢 NOMINAL LOS'; phase.className = 'text-emerald-400 font-bold'; }
   }
 
-  renderGanttBar();
+renderGanttBar();
   renderTelemetryChart();
 }
+
+/* ============================================================================
+   10. 3D SUN-EARTH-MOON ORBIT MODAL (补回全局变量声明，修复 ReferenceError)
+   ============================================================================ */
+let orbitInit = false, orbitScene, orbitCamera, orbitRenderer, moonGroup, sunMesh, earthMesh, moonMesh;
+let isDraggingOrbit = false, prevOrbitMouse = { x: 0, y: 0 };
+const orbitCam = { theta: 0.6, phi: 0.45, radius: 34 };
 
 function initOrbitScene() {
   if (orbitInit) return;
@@ -2338,7 +2346,7 @@ function renderGanttBar() {
    修复 4：智能局部刷新引擎 (Virtual DOM Diff 模式)
    ============================================================================ */
 window.addEventListener('load', () => {
-  let lastState = Store.getState(); 
+  let lastState = { ...Store.getState(), selectedSiteIds: [...Store.getState().selectedSiteIds] };
 
   Store.subscribe((state) => {
     const siteChanged = lastState.selectedSiteIds.join(',') !== state.selectedSiteIds.join(',');
@@ -2348,23 +2356,26 @@ window.addEventListener('load', () => {
     const depthChanged = lastState.depth !== state.depth;
     const themeChanged = lastState.theme !== state.theme;
     const viewChanged = lastState.moonView !== state.moonView;
-    
-    lastState = state; 
 
-    // 如果是重大改变（切地点、切模式、切主题等），才全量重绘
+    // 关键修复：深拷贝保存上一次状态快照，避免引用共享
+    lastState = { ...state, selectedSiteIds: [...state.selectedSiteIds] };
+
+    // 如果是重大改变（切地点、切模式、切主题等），全量重绘
     if (modeChanged || siteChanged || twChanged || viewChanged || depthChanged || themeChanged) {
-      updateUI(); 
+      updateUI();
     }
-    // 如果仅仅是时间轴 (timeHours) 变了（正在播放动画），只做局部重绘！
+    // 如果仅仅是时间轴 (timeHours) 变了（播放动画或拖滑块），执行高速局部重绘
     else if (timeChanged) {
-      const { mode, selectedSiteIds } = state;
-      
+      const { mode, selectedSiteIds, activeTW, timeHours } = state;
+      const primarySite = getSite();
+      const sky = computeSkyState(primarySite, activeTW, timeHours);
+
       if (mode === 'planner') {
         const s1 = SITES.find(s => s.id === selectedSiteIds[0]) || SITES[0];
         renderPOVCanvas(document.getElementById('povSun1'), 'sun', s1);
         renderPOVCanvas(document.getElementById('povEarth1'), 'earth', s1);
         updatePOVLabels(s1, 1);
-        
+
         if (selectedSiteIds.length > 1) {
           const s2 = SITES.find(s => s.id === selectedSiteIds[1]);
           renderPOVCanvas(document.getElementById('povSun2'), 'sun', s2);
@@ -2372,32 +2383,47 @@ window.addEventListener('load', () => {
           updatePOVLabels(s2, 2);
         }
 
+        // 实时更新右侧太阳/地球 ENU 角度文本
+        document.getElementById('seSunAz').textContent = `Az ${sky.sunAz.toFixed(1)}°`;
+        document.getElementById('seSunEl').textContent = `El ${sky.sunEl.toFixed(2)}° (Mask +${sky.maskAtSun.toFixed(1)}°)`;
+        document.getElementById('seEarthAz').textContent = `Az ${sky.earthAz.toFixed(1)}°`;
+        document.getElementById('seEarthEl').textContent = `El ${sky.earthEl.toFixed(2)}° (Mask +${sky.maskAtEarth.toFixed(1)}°)`;
+
         renderTelemetryChart();
         updateMoon3DTerrain();
         drawHorizonRadar(document.getElementById('horizonRadarPlanner'), document.getElementById('horizonPeakNote'));
       } else if (mode === 'educator') {
-        renderPOVCanvas(document.getElementById('povEducator'), 'earth', getSite());
+        renderPOVCanvas(document.getElementById('povEducator'), 'earth', primarySite);
         renderEducatorRight();
       } else if (mode === 'public') {
-        renderPOVCanvas(document.getElementById('povPublic'), 'earth', getSite());
+        renderPOVCanvas(document.getElementById('povPublic'), 'earth', primarySite);
         renderPublic();
       }
 
-      // 更新全局时间文本与轨道仪
+      // 实时更新底部时间文本、日期与阶段状态文字
       const tEl = document.getElementById('timeReadout');
-      if (tEl) tEl.textContent = 'T + ' + state.timeHours.toFixed(1) + ' h';
+      if (tEl) tEl.textContent = 'T + ' + timeHours.toFixed(1) + ' h';
       const dEl = document.getElementById('dateReadout');
       if (dEl) {
-        const startMs = new Date(TW_DEFS[state.activeTW].start).getTime();
-        dEl.textContent = new Date(startMs + state.timeHours * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+        const startMs = new Date(TW_DEFS[activeTW].start).getTime();
+        dEl.textContent = new Date(startMs + timeHours * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+      }
+      const phase = document.getElementById('phaseText');
+      if (phase) {
+        if (sky.isEarthOccultation) { phase.textContent = '🟣 EARTH OCCULTATION (POWER 0% / COMM 100%)'; phase.className = 'text-purple-300 font-bold'; }
+        else if (!sky.commActive && sky.sunFactor === 0) { phase.textContent = '🔴 TOTAL BLACKOUT'; phase.className = 'text-red-400 font-bold'; }
+        else if (!sky.commActive) { phase.textContent = '🟡 COMM BLOCKED BY MOUNTAIN'; phase.className = 'text-amber-300 font-bold'; }
+        else if (sky.sunFactor === 0) { phase.textContent = '⚡ TERRAIN SHADOW'; phase.className = 'text-amber-300 font-bold'; }
+        else { phase.textContent = '🟢 NOMINAL LOS'; phase.className = 'text-emerald-400 font-bold'; }
       }
       if (orbitInit && document.getElementById('orbitModal').style.display === 'flex') updateOrbitScene();
     }
   });
 
   const sp = document.getElementById('playSpeed');
-  if (sp) sp.addEventListener('change', e => Store.setState({ speed: parseFloat(e.target.value) }));
+  if (sp) sp.addEventListener('change', e => Store.setState({ speed: parseFloat(e.target.value) || 1 }));
   selectPresetCase('occultation_case');
+  updateUI(); // 确保首屏立即完整渲染一次
   setTimeout(() => connectApi(), 500);
 
   // C-1 演示键盘快捷键
