@@ -1227,7 +1227,10 @@ function renderPOVCanvas(canvas, viewMode, renderSite) {
   const allMax = Math.max(maxEl, sky.sunEl, sky.earthEl, 8);
   const span = Math.max(4.0, allMax - allMin);
 
-  const elToY = el => H * 0.95 - ((el - allMin) / span) * (H * 0.90);
+  const elToY = el => {
+    if (isNaN(el) || !isFinite(el)) return H * 0.95; // 拦截 NaN，防止破坏整条 Canvas 路径
+    return H * 0.95 - ((el - allMin) / span) * (H * 0.90);
+  };
   const relSun = relAzOf(sky.sunAz), sunX = W * 0.5 + (relSun / FOV) * (W * 0.46);
   const relEarth = relAzOf(sky.earthAz), earthX = W * 0.5 + (relEarth / FOV) * (W * 0.46);
   const sunY = elToY(sky.sunEl), earthY = elToY(sky.earthEl);
@@ -1920,7 +1923,12 @@ function initOrbitScene() {
   const c = document.getElementById('orbitContainer'); if (!c) return;
   const w = c.clientWidth || 800, h = c.clientHeight || 500;
   orbitScene = new THREE.Scene(); orbitCamera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
-  orbitRenderer = new THREE.WebGLRenderer({ antialias: true }); orbitRenderer.setSize(w, h); orbitRenderer.setPixelRatio(window.devicePixelRatio || 1);
+  orbitRenderer = new THREE.WebGLRenderer({ antialias: true }); 
+  orbitRenderer.setSize(w, h); 
+  orbitRenderer.setPixelRatio(window.devicePixelRatio || 1);
+  // 强制 DOM 元素 100% 铺满，防止重绘闪烁
+  orbitRenderer.domElement.style.width = '100%';
+  orbitRenderer.domElement.style.height = '100%';
   c.innerHTML = ''; c.appendChild(orbitRenderer.domElement);
 
   const sv = [], rnd = mulberry32(12345);
@@ -1961,8 +1969,19 @@ function initOrbitScene() {
 function toggleOrbitModal(open) {
   const m = document.getElementById('orbitModal'); if (!m) return;
   if (open) {
-    m.style.display = 'flex'; initOrbitScene();
-    setTimeout(() => { const c = document.getElementById('orbitContainer'); if (orbitRenderer && c) { orbitRenderer.setSize(c.clientWidth, c.clientHeight); orbitCamera.aspect = c.clientWidth / c.clientHeight; orbitCamera.updateProjectionMatrix(); } updateOrbitScene(); }, 50);
+    m.style.display = 'flex'; 
+    requestAnimationFrame(() => {
+      initOrbitScene();
+      setTimeout(() => { 
+        const c = document.getElementById('orbitContainer'); 
+        if (orbitRenderer && c && c.clientWidth > 0) { 
+          orbitRenderer.setSize(c.clientWidth, c.clientHeight); 
+          orbitCamera.aspect = c.clientWidth / c.clientHeight; 
+          orbitCamera.updateProjectionMatrix(); 
+        } 
+        updateOrbitScene(); 
+      }, 100);
+    });
   } else m.style.display = 'none';
 }
 
@@ -2128,25 +2147,37 @@ function onTimeScrub(v) { Store.setState({ timeHours: parseFloat(v) }); }
 
 let animFrame = null;
 function togglePlay() {
-  const { playing, speed, activeTW } = Store.getState();
+  const { playing } = Store.getState();
   const newPlaying = !playing;
   Store.setState({ playing: newPlaying });
+  
   ['playPauseBtn', 'playPauseBtnEdu', 'playPauseBtnPub'].forEach(id => {
     const b = document.getElementById(id);
     if (b) b.textContent = newPlaying ? '⏸ PAUSE' : (id === 'playPauseBtnPub' ? '▶ PLAY 30-DAY WINDOW' : '▶ PLAY');
   });
+
   if (newPlaying) {
-    const step = () => {
+    let lastTime = performance.now();
+    const step = (now) => {
       const currentState = Store.getState();
       if (!currentState.playing) return;
+      
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+      
       const mx = TW_DURATION[currentState.activeTW] || 720;
-      const newTime = (currentState.timeHours + 0.45 * currentState.speed) % mx;
+      // 基于真实帧间隔计算时间，保证任何帧率下都能平滑播放
+      const newTime = (currentState.timeHours + dt * 2.0 * currentState.speed) % mx;
+      
       Store.setState({ timeHours: newTime });
       const s = document.getElementById('globalTimeSlider'); if (s) s.value = newTime;
+      
       animFrame = requestAnimationFrame(step);
     };
     animFrame = requestAnimationFrame(step);
-  } else if (animFrame) cancelAnimationFrame(animFrame);
+  } else if (animFrame) {
+    cancelAnimationFrame(animFrame);
+  }
 }
 
 function addCustomSite() {
@@ -2304,7 +2335,51 @@ function renderGanttBar() {
    INIT & RESIZE (已挂载 Store.subscribe)
    ============================================================================ */
 window.addEventListener('load', () => {
-  Store.subscribe(updateUI);
+  let lastState = Store.getState(); // 1. 记住上一次的状态
+
+  Store.subscribe((state) => {
+    // 2. 精确对比：到底是谁发生了改变？
+    const siteChanged = lastState.selectedSiteIds.join(',') !== state.selectedSiteIds.join(',');
+    const twChanged = lastState.activeTW !== state.activeTW;
+    const modeChanged = lastState.mode !== state.mode;
+    const timeChanged = lastState.timeHours !== state.timeHours;
+    const depthChanged = lastState.depth !== state.depth;
+    const themeChanged = lastState.theme !== state.theme;
+    const viewChanged = lastState.moonView !== state.moonView;
+    
+    lastState = state; // 更新快照为最新状态
+   // 3. 渲染分流：如果是重大改变（切地点、切模式、切主题等），才全量重绘
+    if (modeChanged || siteChanged || twChanged || viewChanged || depthChanged || themeChanged) {
+      updateUI(); // 这里才调用极其消耗性能的 DOM 重建
+    }
+   else if (timeChanged) {
+      // 4. 如果仅仅是时间轴 (timeHours) 变了（比如正在播放动画）
+      // 绝对不碰任何 HTML 结构，只针对需要动的地方“打补丁”！
+      
+      const { mode, selectedSiteIds } = state;
+      if (mode === 'planner') {
+        const s1 = SITES.find(s => s.id === selectedSiteIds[0]) || SITES[0];
+        
+        // 只重绘画布里的光线和遮罩
+        renderPOVCanvas(document.getElementById('povSun1'), 'sun', s1);
+        renderPOVCanvas(document.getElementById('povEarth1'), 'earth', s1);
+        updatePOVLabels(s1, 1);
+        
+        // ... (如果是双 POV，更新第二个 POV) ...
+
+        // 只更新遥测图的游标和 3D 光束
+        renderTelemetryChart();
+        updateMoon3DTerrain();
+        drawHorizonRadar(document.getElementById('horizonRadarPlanner'), document.getElementById('horizonPeakNote'));
+      } 
+      // ... (省略 educator 和 public 模式的局部更新) ...
+
+      // 只替换文本节点里的内容，不重建 DOM
+      const tEl = document.getElementById('timeReadout');
+      if (tEl) tEl.textContent = 'T + ' + state.timeHours.toFixed(1) + ' h';
+      // ... (省略日期更新) ...
+    }
+  });
   const sp = document.getElementById('playSpeed');
   if (sp) sp.addEventListener('change', e => Store.setState({ speed: parseFloat(e.target.value) }));
   selectPresetCase('occultation_case');
