@@ -220,20 +220,19 @@
 <div class="border-b border-cyan-500/20 bg-slate-900/80 px-4 py-1.5 flex justify-between items-center text-[10px] mono">
   <div class="flex gap-2">
     <span class="text-slate-500">INFO DEPTH:</span>
-    <button onclick="Store.setState({depth: 'L1'})" class="text-cyan-400 hover:text-white">L1 (BASIC)</button>
-    <button onclick="Store.setState({depth: 'L2'})" class="text-cyan-400 hover:text-white font-bold border-b border-cyan-400">L2 (NOMINAL)</button>
-    <button onclick="Store.setState({depth: 'L3'})" class="text-cyan-400 hover:text-white">L3 (EXPERT)</button>
+    <button id="btn-depth-L1" onclick="Store.setState({depth: 'L1'})" class="text-slate-400 hover:text-white">L1 (BASIC)</button>
+    <button id="btn-depth-L2" onclick="Store.setState({depth: 'L2'})" class="text-cyan-300 hover:text-white font-bold border-b border-cyan-400">L2 (NOMINAL)</button>
+    <button id="btn-depth-L3" onclick="Store.setState({depth: 'L3'})" class="text-slate-400 hover:text-white">L3 (EXPERT)</button>
   </div>
   <div class="flex gap-2">
     <span class="text-slate-500">VISUAL:</span>
-    <button onclick="document.body.dataset.theme='normal'; Store.setState({theme: 'normal'})" class="text-slate-300 hover:text-white">NORMAL</button>
-    <button onclick="document.body.dataset.theme='colorblind'; Store.setState({theme: 'colorblind'})" class="text-slate-300 hover:text-white">COLORBLIND</button>
-    <button onclick="document.body.dataset.theme='high-contrast'; Store.setState({theme: 'high-contrast'})" class="text-slate-300 hover:text-white">HIGH CONTRAST</button>
+    <button id="btn-theme-normal" onclick="document.body.dataset.theme='normal'; Store.setState({theme: 'normal'})" class="text-cyan-300 hover:text-white font-bold border-b border-cyan-400">NORMAL</button>
+    <button id="btn-theme-colorblind" onclick="document.body.dataset.theme='colorblind'; Store.setState({theme: 'colorblind'})" class="text-slate-400 hover:text-white">COLORBLIND</button>
+    <button id="btn-theme-high-contrast" onclick="document.body.dataset.theme='high-contrast'; Store.setState({theme: 'high-contrast'})" class="text-slate-400 hover:text-white">HIGH CONTRAST</button>
   </div>
 </div>
 
-<!-- B-2 Data Provenance 抽屉 (默认隐藏) -->
-<div id="provenanceDrawer" class="fixed right-0 top-0 bottom-0 w-80 bg-slate-950/95 border-l border-cyan-500/30 z-50 transform translate-x-full transition-transform duration-300 p-4 overflow-y-auto hidden">
+<div id="provenanceDrawer" class="fixed right-0 top-0 bottom-0 w-80 bg-slate-950/95 border-l border-cyan-500/30 z-50 transform translate-x-full transition-transform duration-300 p-4 overflow-y-auto shadow-2xl">
   <h2 class="text-cyan-400 font-bold tracking-widest text-xs mb-4">📊 DATA PROVENANCE</h2>
   <div class="text-red-400 text-[10px] border border-red-500/30 bg-red-500/10 p-2 rounded mb-4">
     ⚠ <strong>WHAT THIS IS NOT:</strong> Not a flight-certified link budget. Not engineering-grade hazard detection.
@@ -347,10 +346,11 @@
         </div>
         <div id="ecGateList" class="grid grid-cols-2 gap-1 text-[9px] mono"></div>
       </div>
-      <!-- 新增：数据溯源按钮 (由 L3 控制显示) -->
-      <button id="btnOpenProvenance" onclick="document.getElementById('provenanceDrawer').classList.remove('translate-x-full'); renderProvenance();" class="hidden mt-2 w-full py-1 text-[9px] font-bold tracking-widest text-cyan-400 border border-cyan-500/30 bg-cyan-500/10 rounded hover:bg-cyan-500/20">
+  <!-- 新增：数据溯源按钮 (单一由 style.display 控制) -->
+      <button id="btnOpenProvenance" style="display:none" onclick="document.getElementById('provenanceDrawer').classList.remove('translate-x-full'); renderProvenance();" class="mt-2 w-full py-1 text-[9px] font-bold tracking-widest text-cyan-400 border border-cyan-500/30 bg-cyan-500/10 rounded hover:bg-cyan-500/20">
         📊 OPEN PROVENANCE DATA
       </button>
+    </div>
 
     <div class="space-y-1.5">
       <div>
@@ -801,7 +801,7 @@ async function apiPost(twId) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(12000)
+    signal: AbortSignal.timeout(65000)
   });
   const ct = resp.headers.get('content-type') || '';
   if (!ct.includes('json')) throw new Error('NON_JSON HTTP ' + resp.status);
@@ -913,11 +913,17 @@ function showLoading() {
   if (elapsed) elapsed.textContent = '0.0s';
   if (loadingTimer) clearInterval(loadingTimer);
   loadingTimer = setInterval(() => {
-    const s = ((performance.now() - loadingStart) / 1000).toFixed(1);
-    if (elapsed) elapsed.textContent = s + 's';
+    const sec = (performance.now() - loadingStart) / 1000;
+    if (elapsed) {
+      elapsed.textContent = sec >= 15
+        ? `${sec.toFixed(1)}s · Waking up backend... up to 60s`
+        : `${sec.toFixed(1)}s`;
+      elapsed.className = sec >= 15
+        ? 'text-amber-300 text-[11px] mono font-bold animate-pulse'
+        : 'text-slate-500 text-[10px] mono';
+    }
   }, 100);
 }
-
 function hideLoading() {
   const el = document.getElementById('loadingOverlay');
   if (!el) return;
@@ -986,15 +992,15 @@ const entries = Object.keys(EC_LABELS).map(key => {
 
   list.innerHTML = entries.map(e => {
     let badgeCls, badgeTxt;
-    if (e.pass === true) {
+   if (e.pass === true) {
       badgeCls = 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300';
-      badgeTxt = '✓';
+      badgeTxt = '● PASS';
     } else if (e.pass === false) {
       badgeCls = 'border-red-500/50 bg-red-500/15 text-red-300';
-      badgeTxt = '✕';
+      badgeTxt = '▲ FAIL';
     } else {
       badgeCls = 'border-slate-700/60 bg-slate-800/40 text-slate-500';
-      badgeTxt = '◇ unknown';
+      badgeTxt = '◇ N/A';
     }
     const isCriticalFail = e.key === 'EC-07' && e.pass === false;
     const rowCls = isCriticalFail
@@ -1013,13 +1019,33 @@ const entries = Object.keys(EC_LABELS).map(key => {
 }
 function renderProvenance() {
   const drawer = document.getElementById('provenanceDrawer');
+  if (!drawer) return;
   const site = getSite();
-  const api = getApiResult(site.id, Store.getState().activeTW);
-  if (!api) return;
+  const { activeTW } = Store.getState();
+  const api = getApiResult(site.id, activeTW);
+
+  if (!api) {
+    drawer.innerHTML = `
+      <h2 class="text-cyan-400 font-bold tracking-widest text-xs mb-4">📊 DATA PROVENANCE</h2>
+      <div class="text-red-400 text-[10px] border border-red-500/30 bg-red-500/10 p-2 rounded mb-4">
+        ⚠ <strong>WHAT THIS IS NOT:</strong> Not a flight-certified link budget. Not engineering-grade hazard detection.
+      </div>
+      <div class="text-amber-300 text-[10px] mono border border-amber-500/30 bg-amber-500/10 p-2.5 rounded mb-4">
+        Local engine · No API data (Click ↻ API to sync live provenance)
+      </div>
+      <div class="text-[10px] mono text-slate-300 space-y-3 mb-6">
+        <div><strong class="text-purple-400">SLOPE:</strong> LOLA 5m DEM (Local Fallback) · Horn 3x3</div>
+        <div><strong class="text-emerald-400">EPHEMERIS:</strong> Meeus + IAU Analytical · ±0.1° vs SPICE</div>
+        <div><strong class="text-cyan-400">Q_COMM:</strong> Ground Station: Goldstone · Frequency: X-band only (Ka not modeled) · Multipath: not modeled</div>
+      </div>
+      <button onclick="document.getElementById('provenanceDrawer').classList.add('translate-x-full')" class="mt-4 w-full py-2 bg-slate-800 text-slate-300 rounded text-xs hover:bg-slate-700">CLOSE</button>
+    `;
+    return;
+  }
 
   const prov = api.data_provenance || {};
   const slopeData = prov.slope ? prov.slope.dataset : 'LOLA 5m DEM';
-  
+
   drawer.innerHTML = `
     <h2 class="text-cyan-400 font-bold tracking-widest text-xs mb-4">📊 DATA PROVENANCE</h2>
     <div class="text-red-400 text-[10px] border border-red-500/30 bg-red-500/10 p-2 rounded mb-4">
@@ -1028,19 +1054,19 @@ function renderProvenance() {
     <div class="text-[10px] mono text-slate-300 space-y-3 mb-6">
       <div><strong class="text-purple-400">SLOPE:</strong> ${slopeData} · ${prov.slope?.algorithm || 'Horn 3x3'}</div>
       <div><strong class="text-emerald-400">EPHEMERIS:</strong> Meeus + IAU · ±0.1° vs SPICE</div>
-      <div><strong class="text-cyan-400">Q_COMM:</strong> ${prov.q_comm?.assumptions?.frequency_band || 'X'}-Band · Ground Station: ${prov.q_comm?.assumptions?.ground_station || 'Goldstone'}</div>
+      <div><strong class="text-cyan-400">Q_COMM:</strong> ${prov.q_comm?.assumptions?.frequency_band || 'X'}-Band · Ground Station: ${prov.q_comm?.assumptions?.ground_station || 'Goldstone'}<br><span class="text-slate-400 text-[9px]">Frequency: X-band only (Ka not modeled) · Multipath: not modeled</span></div>
     </div>
     <div class="text-[9px] text-slate-500 mb-1">CURL REPRODUCTION:</div>
     <div class="bg-black p-2 rounded text-[8px] mono text-slate-400 break-all border border-slate-800">
       curl -X POST "https://lunar-mission-browser-api.onrender.com/api/site-evaluation" \\<br>
       -H "Content-Type: application/json" \\<br>
-      -d '{"sites": [{"name": "${site.name}", "lat": ${site.lat}, "lon": ${site.lon}}], "start_time_utc": "2028-09-27T00:00:00Z", "duration_days": 30}'
+      -d '{"sites": [{"name": "${site.name}", "lat": ${site.lat}, "lon": ${site.lon}}], "start_time_utc": "${TW_START_UTC[activeTW]}", "duration_days": 30}'
     </div>
     <button onclick="document.getElementById('provenanceDrawer').classList.add('translate-x-full')" class="mt-4 w-full py-2 bg-slate-800 text-slate-300 rounded text-xs hover:bg-slate-700">CLOSE</button>
   `;
 }
 /* ============================================================================
-   4. PRECOMPUTED SCENARIO SCORES & ECLIPSE FINDER
+   4. PRECOMPUTED SCENARIO SCORES & OCCULTATION FINDER
    ============================================================================ */
 const occultationCache = {};
 function findOccultationHourForSite(site, twId) {
@@ -2026,8 +2052,25 @@ function updateUI() {
 
   if (orbitInit && document.getElementById('orbitModal').style.display === 'flex') updateOrbitScene();
   
-  // B-4 信息深度逻辑必须在 updateUI 内部
-  const depth = Store.getState().depth;
+ // B-4 信息深度 & B-3 视觉按钮动态高亮同步
+  const { depth, theme } = Store.getState();
+  ['L1', 'L2', 'L3'].forEach(lv => {
+    const b = document.getElementById('btn-depth-' + lv);
+    if (b) {
+      b.className = (depth === lv)
+        ? 'text-cyan-300 hover:text-white font-bold border-b border-cyan-400'
+        : 'text-slate-400 hover:text-white';
+    }
+  });
+  ['normal', 'colorblind', 'high-contrast'].forEach(th => {
+    const b = document.getElementById('btn-theme-' + th);
+    if (b) {
+      b.className = (theme === th)
+        ? 'text-cyan-300 hover:text-white font-bold border-b border-cyan-400'
+        : 'text-slate-400 hover:text-white';
+    }
+  });
+
   const ecPanel = document.getElementById('ecGatePanel');
   const enuSun = document.getElementById('seSunAz')?.parentElement;
   const enuEarth = document.getElementById('seEarthAz')?.parentElement;
@@ -2037,7 +2080,7 @@ function updateUI() {
   if (enuSun) enuSun.style.display = depth === 'L1' ? 'none' : 'block';
   if (enuEarth) enuEarth.style.display = depth === 'L1' ? 'none' : 'block';
   if (btnProv) btnProv.style.display = depth === 'L3' ? 'block' : 'none';
-} // 只有一个正确闭合的大括号
+}
 function selectPresetCase(key) {
   if (key === 'occultation_case') {
     Store.setState({ activeTW: 'TW-1', selectedSiteIds: ['gerlache'], timeHours: findOccultationHourForSite(SITES.find(s => s.id === 'gerlache'), 'TW-1') });
@@ -2244,6 +2287,25 @@ window.addEventListener('load', () => {
   if (sp) sp.addEventListener('change', e => Store.setState({ speed: parseFloat(e.target.value) }));
   selectPresetCase('occultation_case');
   setTimeout(() => connectApi(), 500);
+
+  // C-1 演示键盘快捷键：P 播放/暂停，1-4 切换 TW，Esc 关闭抽屉与弹窗
+  window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.key === 'p' || e.key === 'P') {
+      e.preventDefault();
+      togglePlay();
+    } else if (['1', '2', '3', '4'].includes(e.key)) {
+      const tw = 'TW-' + e.key;
+      Store.setState({ activeTW: tw, timeHours: 0 });
+      const s = document.getElementById('globalTimeSlider');
+      if (s) { s.max = TW_DURATION[tw]; s.value = 0; }
+      const r = document.getElementById('rangeLabel');
+      if (r) r.textContent = `0h → ${TW_DURATION[tw]}h`;
+    } else if (e.key === 'Escape') {
+      document.getElementById('provenanceDrawer')?.classList.add('translate-x-full');
+      toggleOrbitModal(false);
+    }
+  });
 });
 window.addEventListener('resize', () => {
   if (moon3DRenderer) {
