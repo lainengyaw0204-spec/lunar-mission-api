@@ -1167,7 +1167,9 @@ let lastMatrixHash = '', lastSiteListHash = '', lastEduSiteHash = '', lastBuilt3
 
 function getSite() { 
   const { selectedSiteIds } = Store.getState();
-  return SITES.find(s => s.id === selectedSiteIds[0]) || SITES[0]; 
+  if (!selectedSiteIds || selectedSiteIds.length === 0) return SITES[0];
+  const found = SITES.find(s => s.id === selectedSiteIds[0]);
+  return found ? found : SITES[0];
 }
 
 function setMode(mode) {
@@ -1353,11 +1355,21 @@ function drawCountdown(ctx, W, site, targetType, sky, api) {
       timeText = diff < 1 ? `Sunset ${(diff * 60).toFixed(0)}m` : `Sunset ${diff.toFixed(1)}h`;
     } else {
       if (sky.sunOK && !sky.isEarthOccultation) {
-        while(nextT <= dur && computeSkyState(site, activeTW, nextT).sunOK && !computeSkyState(site, activeTW, nextT).isEarthOccultation) nextT += 0.5;
+        // Find next sunset
+        while (nextT <= dur) {
+          const k = computeSkyState(site, activeTW, nextT);
+          if (!k.sunOK || k.isEarthOccultation) break;
+          nextT += 0.5;
+        }
         const diff = nextT - timeHours;
         timeText = diff < (dur - timeHours) ? (diff < 1 ? `Sunset ${(diff*60).toFixed(0)}m` : `Sunset ${diff.toFixed(1)}h`) : 'Constant Sun';
       } else {
-        while(nextT <= dur && (!computeSkyState(site, activeTW, nextT).sunOK || computeSkyState(site, activeTW, nextT).isEarthOccultation)) nextT += 0.5;
+        // Find next sunrise
+        while (nextT <= dur) {
+          const k = computeSkyState(site, activeTW, nextT);
+          if (k.sunOK && !k.isEarthOccultation) break;
+          nextT += 0.5;
+        }
         const diff = nextT - timeHours;
         timeText = diff < (dur - timeHours) ? (diff < 1 ? `Shadow ${(diff*60).toFixed(0)}m` : `Shadow ${diff.toFixed(1)}h`) : 'No Sunrise';
       }
@@ -1369,18 +1381,28 @@ function drawCountdown(ctx, W, site, targetType, sky, api) {
       timeText = diff < 1 ? `Earthset ${(diff * 60).toFixed(0)}m` : `Earthset ${diff.toFixed(1)}h`;
     } else {
       if (sky.earthOK) {
-        while(nextT <= dur && computeSkyState(site, activeTW, nextT).earthOK) nextT += 0.5;
+        // Find next earthset
+        while (nextT <= dur) {
+          if (!computeSkyState(site, activeTW, nextT).earthOK) break;
+          nextT += 0.5;
+        }
         const diff = nextT - timeHours;
         timeText = diff < (dur - timeHours) ? (diff < 1 ? `Earthset ${(diff*60).toFixed(0)}m` : `Earthset ${diff.toFixed(1)}h`) : 'Constant Earth';
       } else {
-        while(nextT <= dur && !computeSkyState(site, activeTW, nextT).earthOK) nextT += 0.5;
+        // Find next earthrise
+        while (nextT <= dur) {
+          if (computeSkyState(site, activeTW, nextT).earthOK) break;
+          nextT += 0.5;
+        }
         const diff = nextT - timeHours;
         timeText = diff < (dur - timeHours) ? (diff < 1 ? `Blocked ${(diff*60).toFixed(0)}m` : `Blocked ${diff.toFixed(1)}h`) : 'No Earthrise';
       }
     }
     ctx.fillStyle = cComm;
   }
-  ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.fillText(timeText, W * 0.5, 20);
+  ctx.font = 'bold 10px ui-monospace, monospace'; 
+  ctx.textAlign = 'center'; 
+  ctx.fillText(timeText, W * 0.5, 20);
 }
 
 let moon3DInit = false, moon3DScene, moon3DCam, moon3DRenderer, moon3DMesh, sunDirArrow, earthDirArrow;
