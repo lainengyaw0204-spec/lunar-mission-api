@@ -2145,6 +2145,9 @@ function triggerOccultationMoment() {
 let scrubRaf = null;
 function onTimeScrub(v) { Store.setState({ timeHours: parseFloat(v) }); }
 
+/* ============================================================================
+   修复 3：基于真实时间流逝的非阻塞动画循环
+   ============================================================================ */
 let animFrame = null;
 function togglePlay() {
   const { playing } = Store.getState();
@@ -2332,13 +2335,12 @@ function renderGanttBar() {
 }
 
 /* ============================================================================
-   INIT & RESIZE (已挂载 Store.subscribe)
+   修复 4：智能局部刷新引擎 (Virtual DOM Diff 模式)
    ============================================================================ */
 window.addEventListener('load', () => {
-  let lastState = Store.getState(); // 1. 记住上一次的状态
+  let lastState = Store.getState(); 
 
   Store.subscribe((state) => {
-    // 2. 精确对比：到底是谁发生了改变？
     const siteChanged = lastState.selectedSiteIds.join(',') !== state.selectedSiteIds.join(',');
     const twChanged = lastState.activeTW !== state.activeTW;
     const modeChanged = lastState.mode !== state.mode;
@@ -2347,45 +2349,58 @@ window.addEventListener('load', () => {
     const themeChanged = lastState.theme !== state.theme;
     const viewChanged = lastState.moonView !== state.moonView;
     
-    lastState = state; // 更新快照为最新状态
-   // 3. 渲染分流：如果是重大改变（切地点、切模式、切主题等），才全量重绘
+    lastState = state; 
+
+    // 如果是重大改变（切地点、切模式、切主题等），才全量重绘
     if (modeChanged || siteChanged || twChanged || viewChanged || depthChanged || themeChanged) {
-      updateUI(); // 这里才调用极其消耗性能的 DOM 重建
+      updateUI(); 
     }
-   else if (timeChanged) {
-      // 4. 如果仅仅是时间轴 (timeHours) 变了（比如正在播放动画）
-      // 绝对不碰任何 HTML 结构，只针对需要动的地方“打补丁”！
-      
+    // 如果仅仅是时间轴 (timeHours) 变了（正在播放动画），只做局部重绘！
+    else if (timeChanged) {
       const { mode, selectedSiteIds } = state;
+      
       if (mode === 'planner') {
         const s1 = SITES.find(s => s.id === selectedSiteIds[0]) || SITES[0];
-        
-        // 只重绘画布里的光线和遮罩
         renderPOVCanvas(document.getElementById('povSun1'), 'sun', s1);
         renderPOVCanvas(document.getElementById('povEarth1'), 'earth', s1);
         updatePOVLabels(s1, 1);
         
-        // ... (如果是双 POV，更新第二个 POV) ...
+        if (selectedSiteIds.length > 1) {
+          const s2 = SITES.find(s => s.id === selectedSiteIds[1]);
+          renderPOVCanvas(document.getElementById('povSun2'), 'sun', s2);
+          renderPOVCanvas(document.getElementById('povEarth2'), 'earth', s2);
+          updatePOVLabels(s2, 2);
+        }
 
-        // 只更新遥测图的游标和 3D 光束
         renderTelemetryChart();
         updateMoon3DTerrain();
         drawHorizonRadar(document.getElementById('horizonRadarPlanner'), document.getElementById('horizonPeakNote'));
-      } 
-      // ... (省略 educator 和 public 模式的局部更新) ...
+      } else if (mode === 'educator') {
+        renderPOVCanvas(document.getElementById('povEducator'), 'earth', getSite());
+        renderEducatorRight();
+      } else if (mode === 'public') {
+        renderPOVCanvas(document.getElementById('povPublic'), 'earth', getSite());
+        renderPublic();
+      }
 
-      // 只替换文本节点里的内容，不重建 DOM
+      // 更新全局时间文本与轨道仪
       const tEl = document.getElementById('timeReadout');
       if (tEl) tEl.textContent = 'T + ' + state.timeHours.toFixed(1) + ' h';
-      // ... (省略日期更新) ...
+      const dEl = document.getElementById('dateReadout');
+      if (dEl) {
+        const startMs = new Date(TW_DEFS[state.activeTW].start).getTime();
+        dEl.textContent = new Date(startMs + state.timeHours * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+      }
+      if (orbitInit && document.getElementById('orbitModal').style.display === 'flex') updateOrbitScene();
     }
   });
+
   const sp = document.getElementById('playSpeed');
   if (sp) sp.addEventListener('change', e => Store.setState({ speed: parseFloat(e.target.value) }));
   selectPresetCase('occultation_case');
   setTimeout(() => connectApi(), 500);
 
-  // C-1 演示键盘快捷键：P 播放/暂停，1-4 切换 TW，Esc 关闭抽屉与弹窗
+  // C-1 演示键盘快捷键
   window.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
     if (e.key === 'p' || e.key === 'P') {
@@ -2404,6 +2419,7 @@ window.addEventListener('load', () => {
     }
   });
 });
+
 window.addEventListener('resize', () => {
   if (moon3DRenderer) {
     const c = document.getElementById('moon3DContainer');
