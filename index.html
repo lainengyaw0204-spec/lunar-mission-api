@@ -833,7 +833,7 @@ async function prefetchTw(twId) {
   try {
     const data = await apiPost(twId);
     ingestApiResults(data.results, twId);
-    if (state.activeTW === twId && API.live) updateUI();
+if (Store.getState().activeTW === twId && API.live) updateUI();
   } catch (e) {
     console.warn('prefetch ' + twId + ' failed:', e);
   }
@@ -941,7 +941,7 @@ function renderEcPanel() {
   const summary = document.getElementById('ecGateSummary');
   if (!list || !summary) return;
 
-  const api = getApiResult(getSite().id, state.activeTW);
+ const api = getApiResult(getSite().id, Store.getState().activeTW);
 
   // API 离线 → 显示占位
   if (!api) {
@@ -1972,7 +1972,17 @@ function updateUI() {
 
   if (orbitInit && document.getElementById('orbitModal').style.display === 'flex') updateOrbitScene();
 }
+const depth = Store.getState().depth;
+  const ecPanel = document.getElementById('ecGatePanel');
+  const enuSun = document.getElementById('seSunAz')?.parentElement;
+  const enuEarth = document.getElementById('seEarthAz')?.parentElement;
+  const btnProv = document.getElementById('btnOpenProvenance');
 
+  if (ecPanel) ecPanel.style.display = depth === 'L1' ? 'none' : 'block';
+  if (enuSun) enuSun.style.display = depth === 'L1' ? 'none' : 'block';
+  if (enuEarth) enuEarth.style.display = depth === 'L1' ? 'none' : 'block';
+  if (btnProv) btnProv.style.display = depth === 'L3' ? 'block' : 'none';
+}
 function selectPresetCase(key) {
   if (key === 'occultation_case') {
     Store.setState({ activeTW: 'TW-1', selectedSiteIds: ['gerlache'], timeHours: findOccultationHourForSite(SITES.find(s => s.id === 'gerlache'), 'TW-1') });
