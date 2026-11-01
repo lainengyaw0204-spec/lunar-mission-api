@@ -228,6 +228,7 @@
     <span class="text-slate-500">VISUAL:</span>
     <button onclick="document.body.dataset.theme='normal'; Store.setState({theme: 'normal'})" class="text-slate-300 hover:text-white">NORMAL</button>
     <button onclick="document.body.dataset.theme='colorblind'; Store.setState({theme: 'colorblind'})" class="text-slate-300 hover:text-white">COLORBLIND</button>
+    <button onclick="document.body.dataset.theme='high-contrast'; Store.setState({theme: 'high-contrast'})" class="text-slate-300 hover:text-white">HIGH CONTRAST</button>
   </div>
 </div>
 
@@ -338,7 +339,7 @@
         <div class="text-[10px] text-slate-500 leading-tight">/ 100 · <span id="scoreAssess" class="text-cyan-400 font-bold"></span></div>
       </div>
 
-      <!-- ==================== MODULE B: EC GATE PANEL ==================== -->
+ <!-- ==================== MODULE B: EC GATE PANEL ==================== -->
       <div id="ecGatePanel" class="mt-2 pt-2 border-t border-slate-700/60">
         <div class="flex items-center justify-between mb-1">
           <span class="text-[9px] uppercase tracking-widest text-slate-500">ENGINEERING CONSTRAINTS</span>
@@ -346,7 +347,10 @@
         </div>
         <div id="ecGateList" class="grid grid-cols-2 gap-1 text-[9px] mono"></div>
       </div>
-    </div>
+      <!-- 新增：数据溯源按钮 (由 L3 控制显示) -->
+      <button id="btnOpenProvenance" onclick="document.getElementById('provenanceDrawer').classList.remove('translate-x-full'); renderProvenance();" class="hidden mt-2 w-full py-1 text-[9px] font-bold tracking-widest text-cyan-400 border border-cyan-500/30 bg-cyan-500/10 rounded hover:bg-cyan-500/20">
+        📊 OPEN PROVENANCE DATA
+      </button>
 
     <div class="space-y-1.5">
       <div>
@@ -1007,7 +1011,34 @@ const entries = Object.keys(EC_LABELS).map(key => {
     summary.className = 'text-[9px] mono font-bold text-red-400 pulse-red';
   }
 }
+function renderProvenance() {
+  const drawer = document.getElementById('provenanceDrawer');
+  const site = getSite();
+  const api = getApiResult(site.id, Store.getState().activeTW);
+  if (!api) return;
 
+  const prov = api.data_provenance || {};
+  const slopeData = prov.slope ? prov.slope.dataset : 'LOLA 5m DEM';
+  
+  drawer.innerHTML = `
+    <h2 class="text-cyan-400 font-bold tracking-widest text-xs mb-4">📊 DATA PROVENANCE</h2>
+    <div class="text-red-400 text-[10px] border border-red-500/30 bg-red-500/10 p-2 rounded mb-4">
+      ⚠ <strong>WHAT THIS IS NOT:</strong> Not a flight-certified link budget. Not engineering-grade hazard detection.
+    </div>
+    <div class="text-[10px] mono text-slate-300 space-y-3 mb-6">
+      <div><strong class="text-purple-400">SLOPE:</strong> ${slopeData} · ${prov.slope?.algorithm || 'Horn 3x3'}</div>
+      <div><strong class="text-emerald-400">EPHEMERIS:</strong> Meeus + IAU · ±0.1° vs SPICE</div>
+      <div><strong class="text-cyan-400">Q_COMM:</strong> ${prov.q_comm?.assumptions?.frequency_band || 'X'}-Band · Ground Station: ${prov.q_comm?.assumptions?.ground_station || 'Goldstone'}</div>
+    </div>
+    <div class="text-[9px] text-slate-500 mb-1">CURL REPRODUCTION:</div>
+    <div class="bg-black p-2 rounded text-[8px] mono text-slate-400 break-all border border-slate-800">
+      curl -X POST "https://lunar-mission-browser-api.onrender.com/api/site-evaluation" \\<br>
+      -H "Content-Type: application/json" \\<br>
+      -d '{"sites": [{"name": "${site.name}", "lat": ${site.lat}, "lon": ${site.lon}}], "start_time_utc": "2028-09-27T00:00:00Z", "duration_days": 30}'
+    </div>
+    <button onclick="document.getElementById('provenanceDrawer').classList.add('translate-x-full')" class="mt-4 w-full py-2 bg-slate-800 text-slate-300 rounded text-xs hover:bg-slate-700">CLOSE</button>
+  `;
+}
 /* ============================================================================
    4. PRECOMPUTED SCENARIO SCORES & ECLIPSE FINDER
    ============================================================================ */
@@ -1649,6 +1680,29 @@ function renderPlannerRight() {
   document.getElementById('dimSafe').textContent = sc.safeness.toFixed(0) + ' / 100'; document.getElementById('barSafe').style.width = Math.max(2, sc.safeness) + '%';
   document.getElementById('dimPower').textContent = sc.power.toFixed(1) + '%'; document.getElementById('barPower').style.width = Math.max(2, sc.power) + '%';
   document.getElementById('dimComm').textContent = sc.comm.toFixed(1) + '%'; document.getElementById('barComm').style.width = Math.max(2, sc.comm) + '%';
+ const api = getApiResult(site.id, activeTW);
+  const tSource = api?.site_info?.terrain_source || (site.id.startsWith('custom_') ? 'programmatic_illustrative' : 'lola_dem_synthetic');
+  const sourceText = tSource === 'lola_dem_synthetic' ? 'LOLA DEM-based · 5m resolution' : 'Regional slope only · No NAC screening · Illustrative';
+  let srcDiv = document.getElementById('safeTerrainSource');
+  if (!srcDiv) {
+    srcDiv = document.createElement('div');
+    srcDiv.id = 'safeTerrainSource';
+    srcDiv.className = 'text-[8px] text-slate-500 mt-0.5 text-right';
+    document.getElementById('dimSafe').parentElement.appendChild(srcDiv);
+  }
+  srcDiv.textContent = sourceText;
+
+  // --- 新增 B-6: 锚定值 UI 元素 ---
+  let anchorDiv = document.getElementById('anchorValueText');
+  if (!anchorDiv) {
+    anchorDiv = document.createElement('div');
+    anchorDiv.id = 'anchorValueText';
+    anchorDiv.className = 'text-[9px] font-bold text-cyan-400 mt-1';
+    document.getElementById('scoreCoords').parentNode.appendChild(anchorDiv);
+  }
+  if (site.id === 'malapert') anchorDiv.innerHTML = 'Earth visibility: ~93% (comm only)';
+  else if (site.id === 'shackleton') anchorDiv.innerHTML = 'Earth visibility: ~50% (reference baseline)';
+  else anchorDiv.innerHTML = '';
 
   const sky = computeSkyState(site, activeTW, timeHours);
   document.getElementById('seSunAz').textContent = `Az ${sky.sunAz.toFixed(1)}°`; document.getElementById('seSunEl').textContent = `El ${sky.sunEl.toFixed(2)}° (Mask +${sky.maskAtSun.toFixed(1)}°)`;
@@ -1971,8 +2025,9 @@ function updateUI() {
   }
 
   if (orbitInit && document.getElementById('orbitModal').style.display === 'flex') updateOrbitScene();
-}
-const depth = Store.getState().depth;
+  
+  // B-4 信息深度逻辑必须在 updateUI 内部
+  const depth = Store.getState().depth;
   const ecPanel = document.getElementById('ecGatePanel');
   const enuSun = document.getElementById('seSunAz')?.parentElement;
   const enuEarth = document.getElementById('seEarthAz')?.parentElement;
@@ -1982,7 +2037,7 @@ const depth = Store.getState().depth;
   if (enuSun) enuSun.style.display = depth === 'L1' ? 'none' : 'block';
   if (enuEarth) enuEarth.style.display = depth === 'L1' ? 'none' : 'block';
   if (btnProv) btnProv.style.display = depth === 'L3' ? 'block' : 'none';
-}
+} // 只有一个正确闭合的大括号
 function selectPresetCase(key) {
   if (key === 'occultation_case') {
     Store.setState({ activeTW: 'TW-1', selectedSiteIds: ['gerlache'], timeHours: findOccultationHourForSite(SITES.find(s => s.id === 'gerlache'), 'TW-1') });
