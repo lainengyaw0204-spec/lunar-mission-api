@@ -504,13 +504,12 @@ const PHYS = {
 };
 
 const SITE_BASE = {
-  gerlache:   { lat: -88.67,   lon: -68.10,  slopeDeg: 1.34, psrDistanceKm: 0.8, obstacleDensity: 'MED',  horizonBase: 1.8, ridgeAz: 145, ridgeHeight: 5.2, snrBase: 16.5, riskLevel: 'low', desc: 'Real slope 1.34° (LOLA 5m DEM). Prime Eclipse Paradox site.' },
-  malapert:   { lat: -85.942,  lon: -0.944,  slopeDeg: 4.20, psrDistanceKm: 0.8, obstacleDensity: 'LOW',  horizonBase: 0.6, ridgeAz: 210, ridgeHeight: 2.2, snrBase: 19.2, riskLevel: 'low', desc: 'Elevated massif peak facing Earth (0°E). ~93% sunlight.' },
+  gerlache:   { lat: -88.67,   lon: -68.10,  slopeDeg: 1.34, psrDistanceKm: 0.8, obstacleDensity: 'MED',  horizonBase: 1.8, ridgeAz: 145, ridgeHeight: 5.2, snrBase: 16.5, riskLevel: 'low', desc: 'Real slope 1.34° (LOLA 5m DEM). Prime Earth Occultation Paradox site.' },
+  malapert:   { lat: -85.942,  lon: -0.944,  slopeDeg: 4.20, psrDistanceKm: 0.8, obstacleDensity: 'LOW',  horizonBase: 0.6, ridgeAz: 210, ridgeHeight: 2.2, snrBase: 19.2, riskLevel: 'low', desc: 'Elevated massif peak facing Earth. ~93% Earth visibility (communication). Illumination is separate.' },
   shackleton: { lat: -89.92,   lon: 120.00,  slopeDeg: 4.23, psrDistanceKm: 0.8, obstacleDensity: 'HIGH', horizonBase: 3.2, ridgeAz: 60,  ridgeHeight: 5.8, snrBase: 14.1, riskLevel: 'med', desc: 'Steep crater rim right at 89.92°S. High terrain shadowing.' },
-  nobile:     { lat: -84.2016, lon: 60.6999, slopeDeg: 7.50, psrDistanceKm: 2.1, obstacleDensity: 'MED',  horizonBase: 2.2, ridgeAz: 220, ridgeHeight: 3.8, snrBase: 14.2, riskLevel: 'med', desc: 'Nobile Rim 2 (VIPER-adjacent). Moderate ridge occultations.' },
-  monsmouton: { lat: -85.111,  lon: 26.71,   slopeDeg: 7.50, psrDistanceKm: 2.1, obstacleDensity: 'LOW',  horizonBase: 0.9, ridgeAz: 180, ridgeHeight: 2.4, snrBase: 18.0, riskLevel: 'med', desc: 'Mons Mouton plateau. Broad visibility with gentle horizon.' }
+  nobile:     { lat: -84.2016, lon: 60.6999, slopeDeg: 7.50, psrDistanceKm: 2.1, obstacleDensity: 'MED',  horizonBase: 2.2, ridgeAz: 220, ridgeHeight: 3.8, snrBase: 14.2, riskLevel: 'med', desc: 'Nobile Rim 2 (VIPER-adjacent). Moderate ridge occultations.' }
 };
-const SITE_NAME_MAP = { gerlache: 'de Gerlache Rim 2', malapert: 'Malapert Massif', shackleton: 'Shackleton Rim', nobile: 'Nobile Rim 2', monsmouton: 'Mons Mouton' };
+const SITE_NAME_MAP = { gerlache: 'de Gerlache Rim 2', malapert: 'Malapert Massif', shackleton: 'Shackleton Rim', nobile: 'Nobile Rim 2' };
 
 function makeSite(id, name) {
   return {
@@ -673,7 +672,6 @@ const SITE_API_KEY = {
   malapert: 'Malapert',
   shackleton: 'Shackleton',
   nobile: 'Nobile',
-  monsmouton: 'Mouton'
 };
 
 async function apiPost(twId) {
@@ -821,14 +819,14 @@ function hideLoading() {
    MODULE B — EC Gate Panel Rendering
    ============================================================================ */
 const EC_LABELS = {
-  'EC-01': 'Slope ≤ 8°',
-  'EC-02': 'Azimuthal Slope',
-  'EC-03': 'Roughness RMS',
-  'EC-04': 'PSR Distance',
-  'EC-05': 'EVA Reach',
-  'EC-06': 'Boulder Density',
-  'EC-07': 'Continuous Sun ≥ 6.5 d',
-  'EC-08': 'Earth Visibility'
+  'EC-01': 'HLS Slope ≤ 8°',
+  'EC-02': 'EVA Slope ≤ 20°',
+  'EC-03': 'CLPS Slope ≤ 10°',
+  'EC-04': 'Obstacle 2m (N/A)',
+  'EC-05': 'EVA PSR ≤ 1.38 km',
+  'EC-06': 'ISRU PSR ≤ 10 km',
+  'EC-07': 'Continuous Sun ≥ 6.5d',
+  'EC-08': 'Full Disk Visibility'
 };
 
 function renderEcPanel() {
@@ -847,12 +845,16 @@ function renderEcPanel() {
   }
 
   const ec = api.engineering_constraints || {};
-  const entries = Object.keys(EC_LABELS).map(key => {
+const entries = Object.keys(EC_LABELS).map(key => {
     let raw = ec[key];
     if (key === 'EC-07' && raw === undefined) raw = ec['EC-07_illum'];
-    let pass = null;
-    if (typeof raw === 'boolean') pass = raw;
-    else if (raw && typeof raw === 'object') pass = raw.pass;
+    let pass = null; // null 严格代表 unavailable
+    if (raw && typeof raw === 'object') {
+      if (raw.pass === true) pass = true;
+      else if (raw.pass === false) pass = false;
+    } else if (typeof raw === 'boolean') {
+      pass = raw;
+    }
     return { key, label: EC_LABELS[key], pass };
   });
 
@@ -881,7 +883,7 @@ function renderEcPanel() {
       badgeTxt = '✕';
     } else {
       badgeCls = 'border-slate-700/60 bg-slate-800/40 text-slate-500';
-      badgeTxt = '·';
+      badgeTxt = '◇ unknown';
     }
     const isCriticalFail = e.key === 'EC-07' && e.pass === false;
     const rowCls = isCriticalFail
@@ -970,20 +972,25 @@ function computeSafeness(site) {
 function computeScore(site, tw) {
   const api = getApiResult(site.id, tw);
   if (api) {
-    const ec = api.engineering_constraints || {};
-    const rawEc07 = ec['EC-07'] ?? ec['EC-07_illum'] ?? true;
-    const ec07 = typeof rawEc07 === 'object' && rawEc07 !== null ? rawEc07.pass : Boolean(rawEc07);
-    const total = ec07 ? api.summary.score : 0;
-    return {
-      safeness: computeSafeness(site),
-      power: api.summary.power_pct,
-      comm: api.summary.comm_pct,
-      total: total,
-      maxInt: api.summary.max_dark_hours,
-      assessment: ec07 ? api.summary.assessment : 'No-Go',
-      ec07_pass: ec07
-    };
-  }
+        const ec = api.engineering_constraints || {};
+        const rawEc07 = ec['EC-07'] ?? ec['EC-07_illum'];
+        let ec07 = null;
+        if (rawEc07 && typeof rawEc07 === 'object') {
+          if (rawEc07.pass === true) ec07 = true;
+          else if (rawEc07.pass === false) ec07 = false;
+        } else if (typeof rawEc07 === 'boolean') {
+          ec07 = rawEc07;
+        }
+        return {
+          safeness: computeSafeness(site),
+          power: api.summary.power_pct,
+          comm: api.summary.comm_pct,
+          total: ec07 === true ? api.summary.score : 0,
+          maxInt: api.summary.max_dark_hours,
+          assessment: ec07 === true ? api.summary.assessment : (ec07 === false ? 'No-Go' : 'EC-07 unavailable'),
+          ec07_pass: ec07
+        };
+      }
   const p = PRECOMPUTED[site.id + '-' + tw];
   const s = computeSafeness(site);
   return {
@@ -1241,7 +1248,49 @@ function renderPOVCanvas(canvas, viewMode) {
     ctx.fillText(`▲ Ridge +${maxPeakEl.toFixed(1)}°`, maxPeakX, Math.max(14, maxPeakY - 6));
   }
 }
+// --- 新增: 倒计时 UI ---
+  let timeText = '—';
+  const api = getApiResult(site.id, state.activeTW);
+  const dur = TW_DURATION[state.activeTW] || 720;
+  let nextT = state.timeHours;
 
+  if (targetType === 'sun') {
+    if (api && api.summary && api.summary.next_sunset_h !== undefined && sky.sunOK && !sky.isEclipse) {
+      const diff = api.summary.next_sunset_h;
+      timeText = diff < 1 ? `Sunset in ${(diff * 60).toFixed(0)}m` : `Sunset in ${diff.toFixed(1)}h`;
+    } else {
+      if (sky.sunOK && !sky.isEclipse) {
+        while(nextT <= dur && computeSkyState(site, state.activeTW, nextT).sunOK && !computeSkyState(site, state.activeTW, nextT).isEclipse) nextT += 0.5;
+        const diff = nextT - state.timeHours;
+        timeText = diff < (dur - state.timeHours) ? (diff < 1 ? `Sunset in ${(diff*60).toFixed(0)}m` : `Sunset in ${diff.toFixed(1)}h`) : 'Constant Sun';
+      } else {
+        while(nextT <= dur && (!computeSkyState(site, state.activeTW, nextT).sunOK || computeSkyState(site, state.activeTW, nextT).isEclipse)) nextT += 0.5;
+        const diff = nextT - state.timeHours;
+        timeText = diff < (dur - state.timeHours) ? (diff < 1 ? `In shadow for ${(diff*60).toFixed(0)}m more` : `In shadow for ${diff.toFixed(1)}h more`) : 'No upcoming sunrise';
+      }
+    }
+    ctx.fillStyle = '#fde047';
+    ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(timeText, W * 0.5, 20);
+  } else if (targetType === 'earth') {
+    if (api && api.summary && api.summary.next_earthset_h !== undefined && sky.earthOK) {
+      const diff = api.summary.next_earthset_h;
+      timeText = diff < 1 ? `Earthset in ${(diff * 60).toFixed(0)}m` : `Earthset in ${diff.toFixed(1)}h`;
+    } else {
+      if (sky.earthOK) {
+        while(nextT <= dur && computeSkyState(site, state.activeTW, nextT).earthOK) nextT += 0.5;
+        const diff = nextT - state.timeHours;
+        timeText = diff < (dur - state.timeHours) ? (diff < 1 ? `Earthset in ${(diff*60).toFixed(0)}m` : `Earthset in ${diff.toFixed(1)}h`) : 'Constant Earth';
+      } else {
+        while(nextT <= dur && !computeSkyState(site, state.activeTW, nextT).earthOK) nextT += 0.5;
+        const diff = nextT - state.timeHours;
+        timeText = diff < (dur - state.timeHours) ? (diff < 1 ? `Blocked for ${(diff*60).toFixed(0)}m more` : `Blocked for ${diff.toFixed(1)}h more`) : 'No upcoming earthrise';
+      }
+    }
+    ctx.fillStyle = '#67e8f9';
+    ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(timeText, W * 0.5, 20);
+  }
 /* ============================================================================
    7. REAL 3D CRATER BOWL TERRAIN MESH
    ============================================================================ */
@@ -1604,12 +1653,32 @@ function renderPlannerRight() {
   const site = getSite(), sc = computeScore(site, state.activeTW);
   const rl = riskOf(sc.assessment, site.riskLevel);
 
-  document.getElementById('scoreName').textContent = site.name;
-  document.getElementById('scoreCoords').textContent = `${Math.abs(site.lat).toFixed(2)}°S · ${((site.lon + 360) % 360).toFixed(1)}°E`;
+document.getElementById('scoreName').textContent = site.name;
+  const customWarn = document.getElementById('customWarn');
+  if (site.id.startsWith('custom_')) {
+    customWarn.textContent = '⚠ Custom site uses programmatic terrain. Not LOLA DEM. Illustrative only. Engineering grade: false';
+    customWarn.classList.remove('hidden');
+    document.getElementById('scoreCoords').innerHTML = `${Math.abs(site.lat).toFixed(2)}°S · ${((site.lon + 360) % 360).toFixed(1)}°E <br><span class="text-amber-400 font-bold block mt-1">⚠ Custom site · Illustrative only</span>`;
+  } else {
+    if(customWarn) customWarn.classList.add('hidden');
+    document.getElementById('scoreCoords').textContent = `${Math.abs(site.lat).toFixed(2)}°S · ${((site.lon + 360) % 360).toFixed(1)}°E`;
+  }
+  
   const totalEl = document.getElementById('scoreTotal');
-  totalEl.textContent = sc.total.toFixed(1);
-  totalEl.style.color = scoreColor(sc.total);
-  document.getElementById('scoreAssess').textContent = sc.assessment || (rl === 'low' ? 'OPTIMAL' : rl === 'med' ? 'VIABLE' : 'HIGH RISK');
+  if (sc.ec07_pass === null) {
+    totalEl.textContent = '—';
+    totalEl.style.color = '#94a3b8';
+    document.getElementById('scoreAssess').textContent = 'EC-07 unavailable';
+  } else if (sc.ec07_pass === false) {
+    totalEl.textContent = '0';
+    totalEl.style.color = '#ef4444';
+    document.getElementById('scoreAssess').textContent = 'No-Go';
+    document.getElementById('scoreAssess').classList.add('pulse-red');
+  } else {
+    totalEl.textContent = sc.total.toFixed(1);
+    totalEl.style.color = scoreColor(sc.total);
+    document.getElementById('scoreAssess').textContent = sc.assessment || (rl === 'low' ? 'OPTIMAL' : rl === 'med' ? 'VIABLE' : 'HIGH RISK');
+  }
 
   const badge = document.getElementById('scoreBadge');
   badge.textContent = rl.toUpperCase() + ' RISK';
