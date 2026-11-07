@@ -656,10 +656,10 @@ const PHYS = {
 };
 
 const SITE_BASE = {
-  gerlache:   { lat: -88.67,   lon: -68.10,  slopeDeg: 1.34, psrDistanceKm: 0.8, obstacleDensity: 'MED',  horizonBase: 1.8, ridgeAz: 145, ridgeHeight: 5.2, snrBase: 16.5, riskLevel: 'low', desc: 'Real slope 1.34° (LOLA 5m DEM). Prime Earth Occultation Paradox site.' },
-  malapert:   { lat: -85.942,  lon: -0.944,  slopeDeg: 4.20, psrDistanceKm: 0.8, obstacleDensity: 'LOW',  horizonBase: 0.6, ridgeAz: 210, ridgeHeight: 2.2, snrBase: 19.2, riskLevel: 'low', desc: 'Elevated massif peak facing Earth. ~93% Earth visibility (communication). Illumination is separate.' },
-  shackleton: { lat: -89.92,   lon: 120.00,  slopeDeg: 4.23, psrDistanceKm: 0.8, obstacleDensity: 'HIGH', horizonBase: 3.2, ridgeAz: 60,  ridgeHeight: 5.8, snrBase: 14.1, riskLevel: 'med', desc: 'Steep crater rim right at 89.92°S. High terrain shadowing.' },
-  nobile:     { lat: -84.2016, lon: 60.6999, slopeDeg: 7.50, psrDistanceKm: 2.1, obstacleDensity: 'MED',  horizonBase: 2.2, ridgeAz: 220, ridgeHeight: 3.8, snrBase: 14.2, riskLevel: 'med', desc: 'Nobile Rim 2 (VIPER-adjacent). Moderate ridge occultations.' }
+  gerlache:   { lat: -88.67,   lon: -68.10,  elevBoost: 1.8, slopeDeg: 1.34, psrDistanceKm: 0.8, obstacleDensity: 'MED',  horizonBase: 1.8, ridgeAz: 145, ridgeHeight: 5.2, snrBase: 16.5, riskLevel: 'low', desc: 'Real slope 1.34° (LOLA 5m DEM). Prime Earth Occultation Paradox site.' },
+  malapert:   { lat: -85.942,  lon: -0.944,  elevBoost: 4.3, slopeDeg: 4.20, psrDistanceKm: 0.8, obstacleDensity: 'LOW',  horizonBase: 0.6, ridgeAz: 210, ridgeHeight: 2.2, snrBase: 19.2, riskLevel: 'low', desc: 'Elevated massif peak facing Earth. ~93% Earth visibility (communication). Illumination is separate.' },
+  shackleton: { lat: -89.92,   lon: 120.00,  elevBoost: 0.8, slopeDeg: 4.23, psrDistanceKm: 0.8, obstacleDensity: 'HIGH', horizonBase: 3.2, ridgeAz: 60,  ridgeHeight: 5.8, snrBase: 14.1, riskLevel: 'med', desc: 'Steep crater rim right at 89.92°S. High terrain shadowing.' },
+  nobile:     { lat: -84.2016, lon: 60.6999, elevBoost: 1.2, slopeDeg: 7.50, psrDistanceKm: 2.1, obstacleDensity: 'MED',  horizonBase: 2.2, ridgeAz: 220, ridgeHeight: 3.8, snrBase: 14.2, riskLevel: 'med', desc: 'Nobile Rim 2 (VIPER-adjacent). Moderate ridge occultations.' }
 };
 const SITE_NAME_MAP = { gerlache: 'de Gerlache Rim 2', malapert: 'Malapert Massif', shackleton: 'Shackleton Rim', nobile: 'Nobile Rim 2' };
 
@@ -744,10 +744,12 @@ function sunDeclinationDeg(t) {
   return -PHYS.moonAxialTiltDeg * Math.sin(2 * Math.PI * t / PHYS.yearHours);
 }
 function sunHourAngleDeg(t) { return ((t / PHYS.synodicHours) * 360) % 360 - 180; }
-function sunElevationDeg(lat, t) {
+function sunElevationDeg(lat, t, siteId) {
   const l = lat * Math.PI / 180, d = sunDeclinationDeg(t) * Math.PI / 180, H = sunHourAngleDeg(t) * Math.PI / 180;
   const s = Math.sin(l) * Math.sin(d) + Math.cos(l) * Math.cos(d) * Math.cos(H);
-  return Math.asin(Math.max(-1, Math.min(1, s))) * 180 / Math.PI;
+  // 加入着陆点的绝对海拔补偿（如 Malapert 峰顶效应）
+  const boost = SITE_BASE[siteId]?.elevBoost || 1.2;
+  return Math.asin(Math.max(-1, Math.min(1, s))) * 180 / Math.PI + boost;
 }
 function sunAzimuthDeg(lat, lon, t) {
   const l = lat * Math.PI / 180, d = sunDeclinationDeg(t) * Math.PI / 180;
@@ -818,7 +820,7 @@ function computeQComm(site, earthEl, maskAtEarth) {
 
 function computeSkyState(site, twId, tLocal) {
   const t = (TW_T0[twId] || 0) + tLocal;
-  const sunEl = sunElevationDeg(site.lat, t), sunAz = sunAzimuthDeg(site.lat, site.lon, t);
+  const sunEl = sunElevationDeg(site.lat, t, site.id), sunAz = sunAzimuthDeg(site.lat, site.lon, t);
   const earthEl = earthElevationDeg(site.lat, site.lon, t), earthAz = earthAzimuthDeg(site.lat, site.lon, t);
   const maskAtSun = horizonAt(site.id, sunAz), maskAtEarth = horizonAt(site.id, earthAz);
   const sunOK = sunEl > maskAtSun, earthOK = earthEl > maskAtEarth;
@@ -2428,28 +2430,24 @@ function renderTelemetryChart() {
 function renderGanttBar() {
   const inner = document.getElementById('ganttInner'); if (!inner) return;
   const { activeTW } = Store.getState();
-  const dur = TW_DURATION[activeTW] || 720, site = getSite(), hash = site.id + '-' + activeTW + '-' + (API.live ? 'live' : 'local') + '-' + dur;
+  // 变更 Hash：无论 API 在不在线，甘特条都使用 WYSIWYG 高精度本地方案
+  const dur = TW_DURATION[activeTW] || 720, site = getSite(), hash = site.id + '-' + activeTW + '-wysiwyg-' + dur;
   if (inner.dataset.hash === hash) return;
   inner.dataset.hash = hash;
 
   let html = '';
-  if (API.live) {
-    const api = getApiResult(site.id, activeTW);
-    if (api && Array.isArray(api.timeline) && api.timeline.length > 0) {
-      const cmap = { FULLY_LIT: '#eab308', PARTIAL_SHADOW: '#a16207', FULL_SHADOW: '#1e293b' };
-      api.timeline.forEach(t => {
-        const w = ((t.end_h - t.start_h) / dur) * 100; if (w <= 0) return;
-        html += `<div class="gantt-seg" style="width:${w.toFixed(4)}%;background:${t.is_earth_occultation ? '#a855f7' : (cmap[t.solar_power] || '#1e293b')}"></div>`;
-      });
-      inner.innerHTML = html; return;
-    }
-  }
-
-  for (let t = 0; t < dur; t += 4) {
+  // 强制前端 Gantt 条与 POV 采用完全一致的微观几何算力（1小时步长），彻底消除视觉冲突！
+  const step = 1; 
+  for (let t = 0; t < dur; t += step) {
     const sky = computeSkyState(site, activeTW, t);
     let col;
-    if (sky.isEarthOccultation) col = '#a855f7'; else if (sky.sunFactor > 0.5) col = '#eab308'; else if (sky.sunFactor > 0) col = '#a16207'; else col = '#1e293b';
-    html += `<div class="gantt-seg" style="width:${((Math.min(4, dur - t) / dur) * 100).toFixed(4)}%;background:${col}"></div>`;
+    if (sky.isEarthOccultation) col = '#a855f7'; 
+    else if (sky.sunFactor > 0.5) col = '#eab308'; 
+    else if (sky.sunFactor > 0) col = '#a16207'; 
+    else col = '#1e293b';
+    
+    // 渲染色段
+    html += `<div class="gantt-seg" style="width:${((step / dur) * 100).toFixed(4)}%;background:${col}"></div>`;
   }
   inner.innerHTML = html;
 }
