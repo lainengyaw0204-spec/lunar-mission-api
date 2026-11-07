@@ -608,11 +608,12 @@
 </div>
 
 <script>
- function nextWizard() {
+function nextWizard(step, profile) {
   document.getElementById('wizard-step-1').classList.add('hidden');
   document.getElementById('wizard-step-2').classList.remove('hidden');
   document.getElementById('wizard-step-2').classList.add('flex');
 }
+
 function finishWizard() {
   const pSite = document.getElementById('wizPrimarySite').value;
   const tw = document.getElementById('wizTW').value;
