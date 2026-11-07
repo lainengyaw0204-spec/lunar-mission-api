@@ -32,13 +32,13 @@
     --c-risk-med: #ffff00;
     --c-risk-high: #ff0000;
   }
- * { box-sizing: border-box; }
+* { box-sizing: border-box; }
  html, body {
-    margin: 0; padding: 0; background: #0f1117; color: #cbd5e1;
+    margin: 0; padding: 0; background: #0a0c10; color: #cbd5e1;
     font-family: ui-monospace, 'JetBrains Mono', 'Fira Code', SFMono-Regular, Menlo, Consolas, monospace;
     overflow: hidden; height: 100vh;
   }
-  .glass { background: rgba(15, 17, 23, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 6px; }
+  .glass { background: rgba(13, 17, 23, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.4); border-radius: 4px; }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .panel-title { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #22d3ee; font-weight: 700; margin-bottom: 6px; }
 
@@ -205,6 +205,54 @@ function finishWizard() {
   overlay.classList.add('opacity-0');
   setTimeout(() => { overlay.style.display = 'none'; }, 700);
 }
+ <!-- 🚀 WIZARD OVERLAY -->
+<div id="wizard-overlay" class="fixed inset-0 z-[99999] bg-[#0a0c10] flex flex-col items-center justify-center transition-opacity duration-700">
+  <div class="absolute inset-0 bg-[url('https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lro_south_pole_1080p.jpg')] bg-cover bg-center opacity-20"></div>
+  
+  <div id="wizard-step-1" class="relative z-10 w-full max-w-4xl p-8 glass flex flex-col items-center">
+    <h1 class="text-3xl text-cyan-300 font-bold tracking-widest mb-2 mono">LUNAR MISSION BROWSER</h1>
+    <h2 class="text-sm text-slate-400 tracking-[0.2em] mb-10 uppercase">Step 1: Select Mission Profile</h2>
+    <div class="grid grid-cols-3 gap-6 w-full">
+      <button onclick="nextWizard()" class="p-6 border border-slate-600 hover:border-cyan-400 bg-slate-900/80 rounded-md text-center transition-colors">
+        <div class="text-2xl mb-3">🏗️</div>
+        <div class="text-cyan-300 font-bold mb-1">Moon Base</div>
+        <div class="text-[10px] text-slate-500">Long-term habitation</div>
+      </button>
+      <button onclick="nextWizard()" class="p-6 border border-slate-600 hover:border-cyan-400 bg-slate-900/80 rounded-md text-center transition-colors">
+        <div class="text-2xl mb-3">💧</div>
+        <div class="text-cyan-300 font-bold mb-1">Ice Prospecting</div>
+        <div class="text-[10px] text-slate-500">Resource utilization</div>
+      </button>
+      <button onclick="nextWizard()" class="p-6 border border-slate-600 hover:border-cyan-400 bg-slate-900/80 rounded-md text-center transition-colors">
+        <div class="text-2xl mb-3">🔨</div>
+        <div class="text-cyan-300 font-bold mb-1">Geological Survey</div>
+        <div class="text-[10px] text-slate-500">Sample return</div>
+      </button>
+    </div>
+  </div>
+
+  <div id="wizard-step-2" class="relative z-10 w-full max-w-xl p-8 glass hidden flex-col items-center">
+    <h2 class="text-sm text-slate-400 tracking-[0.2em] mb-6 uppercase">Step 2: Target Selection</h2>
+    <div class="w-full flex flex-col gap-4">
+      <div>
+        <label class="text-[10px] text-slate-400 uppercase tracking-widest">Primary Site</label>
+        <select id="wizPrimarySite" class="w-full mt-1 bg-slate-900 border border-slate-600 text-cyan-200 p-2 rounded text-sm mono focus:outline-none focus:border-cyan-400">
+          <option value="gerlache">de Gerlache Rim 2</option>
+          <option value="malapert">Malapert Massif</option>
+          <option value="shackleton">Shackleton Rim</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-[10px] text-slate-400 uppercase tracking-widest">Time Window</label>
+        <select id="wizTW" class="w-full mt-1 bg-slate-900 border border-slate-600 text-cyan-200 p-2 rounded text-sm mono focus:outline-none focus:border-cyan-400">
+          <option value="TW-1">TW-1 (Sep 2028)</option>
+          <option value="TW-2">TW-2 (Dec 2028)</option>
+        </select>
+      </div>
+      <button onclick="finishWizard()" class="mt-6 w-full py-3 bg-cyan-600/30 border border-cyan-400 text-cyan-100 font-bold tracking-widest text-sm rounded hover:bg-cyan-600/50">INITIALIZE WORKSPACE</button>
+    </div>
+  </div>
+</div>
 <!-- HEADER -->
 <header class="site-header border-b border-cyan-500/20 bg-[#080f1c] px-4 flex items-center gap-4">
   <div class="flex items-center gap-3 shrink-0">
@@ -351,7 +399,7 @@ function finishWizard() {
         <div class="text-[10px] text-slate-500 leading-tight">/ 100 · <span id="scoreAssess" class="text-cyan-400 font-bold"></span></div>
       </div>
 
- <!-- ==================== MODULE B: EC GATE PANEL ==================== -->
+<!-- ==================== MODULE B: EC GATE PANEL ==================== -->
       <div id="ecGatePanel" class="mt-2 pt-2 border-t border-slate-700/60">
         <div class="flex items-center justify-between mb-1">
           <span class="text-[9px] uppercase tracking-widest text-slate-500">ENGINEERING CONSTRAINTS</span>
@@ -359,6 +407,15 @@ function finishWizard() {
         </div>
         <div id="ecGateList" class="grid grid-cols-2 gap-1 text-[9px] mono"></div>
       </div>
+
+      <!-- 🚀 新增：Mission Analysis AI Panel -->
+      <div id="missionAnalysisPanel" class="mt-2 pt-2 border-t border-slate-700/60">
+        <div class="text-[9px] uppercase tracking-widest text-slate-500 mb-1">MISSION ANALYSIS & NEXT STEPS</div>
+        <div id="aiSummaryText" class="text-[10px] text-slate-300 leading-snug p-2 bg-slate-900/60 border border-slate-700 rounded-md"></div>
+        <div id="aiTimelineText" class="mt-1 text-[9px] mono text-slate-400 bg-black/40 p-1.5 rounded-md"></div>
+      </div>
+
+      <!-- 数据溯源按钮 -->
      <div id="missionAnalysisPanel" class="mt-2 pt-2 border-t border-slate-700/60">
   <div class="text-[9px] uppercase tracking-widest text-slate-500 mb-1">MISSION ANALYSIS & NEXT STEPS</div>
   <div id="aiSummaryText" class="text-[10px] text-slate-300 leading-snug p-2 bg-slate-900/60 border border-slate-700 rounded-md"></div>
@@ -576,6 +633,19 @@ function finishWizard() {
 </div>
 
 <script>
+ function nextWizard() {
+  document.getElementById('wizard-step-1').classList.add('hidden');
+  document.getElementById('wizard-step-2').classList.remove('hidden');
+  document.getElementById('wizard-step-2').classList.add('flex');
+}
+function finishWizard() {
+  const pSite = document.getElementById('wizPrimarySite').value;
+  const tw = document.getElementById('wizTW').value;
+  Store.setState({ selectedSiteIds: [pSite], activeTW: tw, timeHours: 0 });
+  const overlay = document.getElementById('wizard-overlay');
+  overlay.classList.add('opacity-0');
+  setTimeout(() => { overlay.style.display = 'none'; }, 700);
+}
 /* ============================================================================
    1. CONSTANTS & CANDIDATE LANDING SITES
    ============================================================================ */
@@ -1244,106 +1314,84 @@ function renderPOVCanvas(canvas, viewMode, renderSite) {
   const sunOccluded = sky.sunEl <= sky.maskAtSun;
   const earthOccluded = sky.earthEl <= sky.maskAtEarth;
 
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, H * 0.9);
-  if (sky.isEarthOccultation) {
-    skyGrad.addColorStop(0, '#050110'); skyGrad.addColorStop(0.55, '#1e0716'); skyGrad.addColorStop(1, '#3a0a1c');
-  } else {
-    skyGrad.addColorStop(0, '#000206'); skyGrad.addColorStop(0.7, '#050c18'); skyGrad.addColorStop(1, '#0e1626');
-  }
-  ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, W, H);
-
+  // 1. 画天空（星空）
+  ctx.fillStyle = sky.isEarthOccultation ? '#110208' : '#04070a';
+  ctx.fillRect(0, 0, W, H);
   const rnd = mulberry32(7717);
-  ctx.fillStyle = 'rgba(226,232,240,0.75)';
-  for (let i = 0; i < 180; i++) {
-    const sx = rnd() * W, sy = rnd() * (H * 0.4), sz = rnd() < 0.82 ? 1.1 : 1.9;
-    ctx.fillRect(sx, sy, sz, sz);
+  ctx.fillStyle = 'rgba(226,232,240,0.6)';
+  for (let i = 0; i < 150; i++) {
+    ctx.fillRect(rnd() * W, rnd() * (H * 0.6), rnd() < 0.8 ? 1 : 1.5, rnd() < 0.8 ? 1 : 1.5);
   }
 
-  if (Math.abs(relSun) <= FOV + 5) {
-    if (sunOccluded && !sky.isEarthOccultation) {
-      ctx.globalAlpha = 0.2; ctx.beginPath(); ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
-      ctx.fillStyle = '#000000'; ctx.fill(); ctx.globalAlpha = 1.0;
-      ctx.strokeStyle = cRiskHigh; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
-    } else if (!sky.isEarthOccultation) {
-      const sg = ctx.createRadialGradient(sunX, sunY, 1, sunX, sunY, sunR * 5.5);
-      sg.addColorStop(0, 'rgba(254, 240, 138, 0.98)'); sg.addColorStop(0.4, 'rgba(250, 204, 21, 0.42)'); sg.addColorStop(1, 'rgba(250, 204, 21, 0)');
-      ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sunX, sunY, sunR * 5.5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2); ctx.fillStyle = cPower; ctx.fill();
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.stroke();
-    }
-  }
+  // 2. 将视角投影转换为弧形（模拟广角天空穹顶）
+  const arcX = az => W * 0.5 + (az / FOV) * (W * 0.45);
+  const arcY = (el, az) => {
+    // 基础高度映射
+    const baseElY = H * 0.8 - ((el - allMin) / span) * (H * 0.6);
+    // 根据距离中心的视场角产生下垂（抛物线透视）
+    const drop = Math.pow(az / FOV, 2) * (H * 0.15); 
+    return baseElY + drop;
+  };
 
+  const aSunX = arcX(relSun), aSunY = arcY(sky.sunEl, relSun);
+  const aEarthX = arcX(relEarth), aEarthY = arcY(sky.earthEl, relEarth);
+
+  // 3. 绘制地球（带真实贴图或掩星红环）
   if (Math.abs(relEarth) <= FOV + 5) {
-    if (earthOccluded && !sky.isEarthOccultation) {
-      ctx.globalAlpha = 0.2; ctx.beginPath(); ctx.arc(earthX, earthY, earthR, 0, Math.PI * 2);
-      ctx.fillStyle = '#000000'; ctx.fill(); ctx.globalAlpha = 1.0;
-      ctx.strokeStyle = cRiskHigh; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
-    } else if (sky.isEarthOccultation) {
-      const eg = ctx.createRadialGradient(earthX, earthY, earthR * 0.85, earthX, earthY, earthR * 2.8);
-      eg.addColorStop(0, 'rgba(251, 146, 60, 0.98)'); eg.addColorStop(0.45, 'rgba(239, 68, 68, 0.58)'); eg.addColorStop(1, 'rgba(239, 68, 68, 0)');
-      ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(earthX, earthY, earthR * 2.8, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(earthX, earthY, earthR, 0, Math.PI * 2); ctx.fillStyle = '#070a12'; ctx.fill();
-      ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2.5; ctx.stroke();
+    const imgEarth = document.getElementById('imgEarthTexture');
+    if (sky.isEarthOccultation) {
+      ctx.beginPath(); ctx.arc(aEarthX, aEarthY, earthR * 1.1, 0, Math.PI * 2);
+      ctx.fillStyle = '#000'; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)'; ctx.stroke();
     } else {
-      const eg = ctx.createRadialGradient(earthX - earthR * 0.3, earthY - earthR * 0.3, earthR * 0.15, earthX, earthY, earthR);
-      eg.addColorStop(0, '#bae6fd'); eg.addColorStop(0.55, '#0284c7'); eg.addColorStop(1, '#082f49');
-      ctx.beginPath(); ctx.arc(earthX, earthY, earthR, 0, Math.PI * 2); ctx.fillStyle = eg; ctx.fill();
-      ctx.strokeStyle = cComm; ctx.lineWidth = 1.2; ctx.stroke();
+      if (imgEarth && imgEarth.complete && imgEarth.naturalHeight !== 0) {
+        ctx.save();
+        ctx.beginPath(); ctx.arc(aEarthX, aEarthY, earthR, 0, Math.PI * 2); ctx.clip();
+        ctx.drawImage(imgEarth, aEarthX - earthR, aEarthY - earthR, earthR * 2, earthR * 2);
+        ctx.restore();
+      } else {
+        ctx.beginPath(); ctx.arc(aEarthX, aEarthY, earthR, 0, Math.PI * 2);
+        ctx.fillStyle = '#0284c7'; ctx.fill();
+      }
     }
   }
 
- ctx.beginPath(); ctx.moveTo(0, H);
-  for (let x = 0; x <= W; x += 4) {
-    const rel = ((x / W) - 0.5) * 130;
-    const el = horizonAt(renderSite.id, targetAz + rel * 0.85 + 25) * 0.85 + minEl * 0.15;
-    ctx.lineTo(x, elToY(el));
+  // 4. 绘制太阳
+  if (!sky.isEarthOccultation && Math.abs(relSun) <= FOV + 5) {
+    ctx.beginPath(); ctx.arc(aSunX, aSunY, sunR, 0, Math.PI * 2);
+    ctx.fillStyle = '#fef08a'; ctx.fill();
+    ctx.shadowColor = '#facc15'; ctx.shadowBlur = 15; ctx.fill(); ctx.shadowBlur = 0;
   }
-  ctx.lineTo(W, H); ctx.closePath(); ctx.fillStyle = 'rgba(10, 18, 32, 0.65)'; ctx.fill();
 
-  ctx.beginPath(); ctx.moveTo(0, H);
-  const rockRnd = mulberry32(31337);
-  let maxPeakX = W / 2, maxPeakY = H / 2, maxPeakEl = -99;
+  // 5. 绘制真实物理地平线 & LROC 月面图片做底图
+  ctx.beginPath();
+  ctx.moveTo(0, H);
   for (let x = 0; x <= W; x += 2) {
     const rel = ((x / W) - 0.5) * 130;
     const el = horizonAt(renderSite.id, targetAz + rel);
-    const rockNoise = (rockRnd() - 0.5) * 0.18;
-    const y = elToY(el + rockNoise);
-    if (el > maxPeakEl) { maxPeakEl = el; maxPeakX = x; maxPeakY = y; }
-    ctx.lineTo(x, y);
+    ctx.lineTo(x, arcY(el, rel)); // 地形也按弧形扭曲
   }
-  ctx.lineTo(W, H); ctx.closePath();
-
-  const mtnGrad = ctx.createLinearGradient(0, H * 0.2, 0, H);
-  if (sky.isEarthOccultation) {
-    mtnGrad.addColorStop(0, '#2a0f1c'); mtnGrad.addColorStop(0.5, '#110608'); mtnGrad.addColorStop(1, '#020104');
-  } else if (sky.sunOK) {
-    mtnGrad.addColorStop(0, '#1e293b'); mtnGrad.addColorStop(0.45, '#0d1524'); mtnGrad.addColorStop(1, '#010409');
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  
+  const imgSurf = document.getElementById('imgLrocSurface');
+  if (imgSurf && imgSurf.complete && imgSurf.naturalHeight !== 0 && !sky.isEarthOccultation && sky.sunOK) {
+    const pat = ctx.createPattern(imgSurf, 'repeat');
+    ctx.fillStyle = pat;
   } else {
-    mtnGrad.addColorStop(0, '#0f172a'); mtnGrad.addColorStop(1, '#010205');
+    ctx.fillStyle = sky.isEarthOccultation ? '#0f0505' : '#0a0c10';
   }
-  ctx.fillStyle = mtnGrad; ctx.fill();
+  ctx.fill();
+  
+  // 地形红线标识
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
-  const crestColor = targetType === 'sun' ? (sky.sunOK ? cPower : cRiskHigh) : (sky.earthOK ? cComm : cRiskHigh);
-  ctx.globalAlpha = 0.85; ctx.strokeStyle = crestColor; ctx.lineWidth = 2.2; ctx.stroke(); ctx.globalAlpha = 1.0;
-
-  if (targetType === 'sun' && Math.abs(relSun) <= FOV) {
-    ctx.beginPath(); ctx.moveTo(W * 0.5, H * 0.98); ctx.lineTo(sunX, sunY);
-    ctx.strokeStyle = sunOccluded ? cRiskHigh : cPower; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = sunOccluded ? cRiskHigh : cPower; ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center';
-    ctx.fillText(sky.isEarthOccultation ? '🌑 OCCULTED' : (sunOccluded ? `⚠ MASK +${sky.maskAtSun.toFixed(1)}°` : `☀️ +${sky.sunEl.toFixed(1)}°`), sunX, Math.max(26, sunY - sunR - 8));
-  }
-
-  if (targetType === 'earth' && Math.abs(relEarth) <= FOV) {
-    ctx.beginPath(); ctx.moveTo(W * 0.5, H * 0.98); ctx.lineTo(earthX, earthY);
-    ctx.strokeStyle = earthOccluded ? cRiskHigh : cComm; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = sky.isEarthOccultation ? '#fb923c' : (earthOccluded ? cRiskHigh : cComm); ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center';
-    ctx.fillText(sky.isEarthOccultation ? '🌍 CORONA 100%' : (earthOccluded ? `⚠ MASK +${sky.maskAtEarth.toFixed(1)}°` : `🌍 +${sky.earthEl.toFixed(1)}°`), earthX, Math.max(26, earthY - earthR - 8));
-  }
-
-  if (maxPeakEl > minEl + 1.5 && maxPeakX > 40 && maxPeakX < W - 40) {
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.75)'; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'center';
-    ctx.fillText(`▲ +${maxPeakEl.toFixed(1)}°`, maxPeakX, Math.max(14, maxPeakY - 6));
-  }
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.font = '8px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('Image: NASA/LROC', W - 5, H - 5);
 
   drawCountdown(ctx, W, renderSite, targetType, sky, getApiResult(renderSite.id, activeTW));
 }
@@ -1804,10 +1852,32 @@ function renderPlannerRight() {
 
   drawHorizonRadar(document.getElementById('horizonRadarPlanner'), document.getElementById('horizonPeakNote'));
   renderEcPanel();
+  
+  // 生成 AI 总结分析
+  const twDays = TW_DURATION[activeTW] / 24;
+  const summaryEl = document.getElementById('aiSummaryText');
+  const timelineEl = document.getElementById('aiTimelineText');
+  if (summaryEl && timelineEl) {
+    if (sc.ec07_pass === false) {
+      summaryEl.innerHTML = `<span class="text-red-400 font-bold">🚨 CRITICAL:</span> Continuous shadow exceeds survivability limits. Recommend shifting landing target or moving to summer timeline.`;
+    } else if (sc.power < 50) {
+      summaryEl.innerHTML = `<span class="text-amber-400 font-bold">⚠️ LOW POWER:</span> Solar generation inadequate for continuous ops. RTG or heavy battery payload required.`;
+    } else if (sc.comm < 60) {
+      summaryEl.innerHTML = `<span class="text-amber-400 font-bold">⚠️ COMM WARNING:</span> High Earth occultation rate. Lunar relay satellite absolutely required.`;
+    } else {
+      summaryEl.innerHTML = `<span class="text-emerald-400 font-bold">✅ OPTIMAL:</span> Proceed with surface ops. Favorable illumination and Earth line-of-sight.`;
+    }
+    timelineEl.innerHTML = `
+      <div class="text-cyan-400/80 mb-0.5">SUGGESTED OPS TIMELINE:</div>
+      <div>Day 1-${Math.floor(twDays * 0.4)}: Surface Operations</div>
+      <div>Day ${Math.floor(twDays * 0.4)+1}-${Math.floor(twDays * 0.7)}: Comm Blackout/Hibernation</div>
+      <div>Day ${Math.floor(twDays * 0.7)+1}+: Data Uplink Window</div>
+    `;
+  }
+
   renderMatrix();
   renderTradeSpace();
 }
-
 function renderMatrix() {
   const el = document.getElementById('matrixPlanner'); if (!el) return;
   const { selectedSiteIds, activeTW } = Store.getState();
