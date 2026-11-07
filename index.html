@@ -33,12 +33,12 @@
     --c-risk-high: #ff0000;
   }
  * { box-sizing: border-box; }
-  html, body {
-    margin: 0; padding: 0; background: #050914; color: #cbd5e1;
+ html, body {
+    margin: 0; padding: 0; background: #0f1117; color: #cbd5e1;
     font-family: ui-monospace, 'JetBrains Mono', 'Fira Code', SFMono-Regular, Menlo, Consolas, monospace;
     overflow: hidden; height: 100vh;
   }
-  .glass { background: rgba(11, 18, 34, 0.80); backdrop-filter: blur(14px); border: 1px solid rgba(34, 211, 238, 0.16); border-radius: 10px; }
+  .glass { background: rgba(15, 17, 23, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 6px; }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .panel-title { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #22d3ee; font-weight: 700; margin-bottom: 6px; }
 
@@ -191,7 +191,20 @@
 </style>
 </head>
 <body class="mode-planner">
-
+function nextWizard(step, profile) {
+  document.getElementById('wizard-step-1').classList.add('hidden');
+  document.getElementById('wizard-step-2').classList.remove('hidden');
+  document.getElementById('wizard-step-2').classList.add('flex');
+}
+function finishWizard() {
+  const pSite = document.getElementById('wizPrimarySite').value;
+  const tw = document.getElementById('wizTW').value;
+  Store.setState({ selectedSiteIds: [pSite], activeTW: tw, timeHours: 0 });
+  
+  const overlay = document.getElementById('wizard-overlay');
+  overlay.classList.add('opacity-0');
+  setTimeout(() => { overlay.style.display = 'none'; }, 700);
+}
 <!-- HEADER -->
 <header class="site-header border-b border-cyan-500/20 bg-[#080f1c] px-4 flex items-center gap-4">
   <div class="flex items-center gap-3 shrink-0">
@@ -346,7 +359,11 @@
         </div>
         <div id="ecGateList" class="grid grid-cols-2 gap-1 text-[9px] mono"></div>
       </div>
-  <!-- 新增：数据溯源按钮 (单一由 style.display 控制) -->
+     <div id="missionAnalysisPanel" class="mt-2 pt-2 border-t border-slate-700/60">
+  <div class="text-[9px] uppercase tracking-widest text-slate-500 mb-1">MISSION ANALYSIS & NEXT STEPS</div>
+  <div id="aiSummaryText" class="text-[10px] text-slate-300 leading-snug p-2 bg-slate-900/60 border border-slate-700 rounded-md"></div>
+  <div id="aiTimelineText" class="mt-1 text-[9px] mono text-slate-400 bg-black/40 p-1.5 rounded-md"></div>
+</div>
       <button id="btnOpenProvenance" style="display:none" onclick="document.getElementById('provenanceDrawer').classList.remove('translate-x-full'); renderProvenance();" class="mt-2 w-full py-1 text-[9px] font-bold tracking-widest text-cyan-400 border border-cyan-500/30 bg-cyan-500/10 rounded hover:bg-cyan-500/20">
         📊 OPEN PROVENANCE DATA
       </button>
@@ -1699,7 +1716,31 @@ function renderTWList() {
     }));
   });
 }
+function generateMissionSummary(site, sc, sky) {
+  const summaryEl = document.getElementById('aiSummaryText');
+  const timelineEl = document.getElementById('aiTimelineText');
+  if (!summaryEl || !timelineEl) return;
 
+  // 1. 生成规则态势评估
+  if (sc.ec07_pass === false) {
+    summaryEl.innerHTML = `<span class="text-red-400 font-bold">🚨 CRITICAL:</span> Continuous shadow exceeds survivability limits. Recommend shifting landing target or moving to summer timeline.`;
+  } else if (sc.power < 50) {
+    summaryEl.innerHTML = `<span class="text-amber-400 font-bold">⚠️ LOW POWER:</span> Solar generation inadequate for continuous ops. RTG or heavy battery payload required.`;
+  } else if (sc.comm < 60) {
+    summaryEl.innerHTML = `<span class="text-amber-400 font-bold">⚠️ COMM WARNING:</span> High Earth occultation rate. Lunar relay satellite absolutely required.`;
+  } else {
+    summaryEl.innerHTML = `<span class="text-emerald-400 font-bold">✅ OPTIMAL:</span> Proceed with surface ops. Favorable illumination and Earth line-of-sight.`;
+  }
+
+  // 2. 生成建议时间轴
+  const twDays = TW_DURATION[Store.getState().activeTW] / 24;
+  timelineEl.innerHTML = `
+    <div class="text-cyan-400/80 mb-0.5">SUGGESTED OPS TIMELINE:</div>
+    <div>Day 1-${Math.floor(twDays * 0.4)}: Surface Operations</div>
+    <div>Day ${Math.floor(twDays * 0.4)+1}-${Math.floor(twDays * 0.7)}: Comm Blackout/Hibernation</div>
+    <div>Day ${Math.floor(twDays * 0.7)+1}+: Data Uplink Window</div>
+  `;
+}
 function renderPlannerRight() {
   const { activeTW, timeHours } = Store.getState();
   const site = getSite(); 
@@ -1741,6 +1782,7 @@ function renderPlannerRight() {
     srcDiv.id = 'safeTerrainSource';
     srcDiv.className = 'text-[8px] text-slate-500 mt-0.5 text-right';
     document.getElementById('dimSafe').parentElement.appendChild(srcDiv);
+   generateMissionSummary(site, sc, sky);
   }
   srcDiv.textContent = sourceText;
 
@@ -2457,6 +2499,8 @@ window.addEventListener('resize', () => {
   }
   updateUI();
 });
+ <img id="imgLrocSurface" src="https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lro_south_pole_1080p.jpg" crossorigin="anonymous" style="display:none;">
+<img id="imgEarthTexture" src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/320px-The_Earth_seen_from_Apollo_17.jpg" crossorigin="anonymous" style="display:none;">
 </script>
 </body>
 </html>
