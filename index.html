@@ -44,7 +44,7 @@
 
   .site-btn { font-size: 12px; padding: 8px 10px; transition: all 0.15s; border: 1px solid rgba(51,65,85,0.8); background: rgba(15,23,42,0.55); cursor: pointer; text-align: left; border-radius: 6px; width: 100%; }
   .site-btn:hover { border-color: rgba(34,211,238,0.45); }
-  .site-btn.active { border-color: #22d3ee; background: rgba(34,211,238,0.12); box-shadow: 0 0 12px rgba(34,211,238,0.22); }
+  .site-btn.active { border-color: #22d3ee; background: rgba(34,211,238,0.12); }
   .tw-btn { font-size: 12px; padding: 6px 8px; transition: all 0.15s; border: 1px solid #334155; background: rgba(15,23,42,0.45); cursor: pointer; border-radius: 6px; }
   .tw-btn.active { border-color: #22d3ee; background: rgba(34,211,238,0.16); color: #67e8f9; }
   .view-btn { transition: all 0.15s; font-size: 10px; padding: 3px 9px; border-radius: 4px; cursor: pointer; font-weight: bold; }
@@ -71,7 +71,7 @@
 
   .mode-btn { transition: all 0.2s; border: 1px solid rgba(34,211,238,0.2); background: rgba(15,23,42,0.6); color: #94a3b8; font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 6px; cursor: pointer; letter-spacing: 0.06em; }
   .mode-btn:hover { border-color: rgba(34,211,238,0.5); color: #cbd5e1; }
-  body.mode-planner #btn-mode-planner, body.mode-educator #btn-mode-educator, body.mode-public #btn-mode-public { background: rgba(34,211,238,0.18); border-color: #22d3ee; color: #67e8f9; box-shadow: 0 0 12px rgba(34,211,238,0.3); }
+ body.mode-planner #btn-mode-planner, body.mode-educator #btn-mode-educator, body.mode-public #btn-mode-public { background: rgba(34,211,238,0.18); border-color: #22d3ee; color: #67e8f9; }
 
   #viewPlanner { grid-template-columns: 255px 1fr 410px; gap: 10px; padding: 10px; height: calc(100vh - 56px - 76px); }
   #viewPlanner .center-stack { display: grid; grid-template-rows: 46% 54%; gap: 10px; min-width: 0; min-height: 0; }
@@ -85,11 +85,11 @@
   .gantt-bar { display: flex; height: 100%; border-radius: 4px; overflow: hidden; background: #0a101d; }
   .gantt-seg { height: 100%; }
 
-  .big-play { padding: 14px 40px; font-size: 15px; font-weight: 700; letter-spacing: 0.14em; color: #000; background: linear-gradient(135deg,#22d3ee,#06b6d4); border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 0 30px rgba(34,211,238,0.45); transition: all 0.2s; }
-  .big-play:hover { box-shadow: 0 0 50px rgba(34,211,238,0.7); transform: scale(1.02); }
+ .big-play { padding: 14px 40px; font-size: 15px; font-weight: 700; letter-spacing: 0.14em; color: #000; background: linear-gradient(135deg,#22d3ee,#06b6d4); border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+  .big-play:hover { transform: scale(1.02); }
 
-  .score-circle { width: 150px; height: 150px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 30%, rgba(34,211,238,0.15), rgba(5,9,20,0.92)); border: 2px solid #22d3ee; box-shadow: 0 0 32px rgba(34,211,238,0.35), inset 0 0 24px rgba(34,211,238,0.1); color: #fff; }
-  .score-circle .val { font-size: 46px; font-weight: 700; line-height: 1; text-shadow: 0 0 20px currentColor; }
+  .score-circle { width: 150px; height: 150px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 30%, rgba(34,211,238,0.15), rgba(5,9,20,0.92)); border: 2px solid #22d3ee; color: #fff; }
+  .score-circle .val { font-size: 46px; font-weight: 700; line-height: 1; }
   .score-circle .lbl { font-size: 10px; letter-spacing: 0.2em; color: rgba(255,255,255,0.75); margin-top: 4px; }
   .score-circle.power { border-color: #facc15; }
   .score-circle.power .val { color: #fde047; }
@@ -98,16 +98,16 @@
   .score-circle.safe { border-color: #a855f7; }
   .score-circle.safe .val { color: #c084fc; }
 
-  .occultation-callout { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(88,28,135,0.88); backdrop-filter: blur(18px); border: 2px solid #a855f7; border-radius: 14px; padding: 20px 28px; text-align: center; box-shadow: 0 0 50px rgba(168,85,247,0.65); z-index: 20; }
+.occultation-callout { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(88,28,135,0.88); backdrop-filter: blur(18px); border: 2px solid #a855f7; border-radius: 8px; padding: 20px 28px; text-align: center; z-index: 20; }
   .pulse-red { animation: pulseRed 1.2s infinite; }
   @keyframes pulseRed { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
-  .number-glow { text-shadow: 0 0 12px currentColor; }
+  .number-glow { /* 移除阴影 */ }
 
   header.site-header { height: 56px; }
   footer.footer-bar { height: 76px; }
 
-  .split-divider { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 2px; background: linear-gradient(to bottom, transparent, #22d3ee, transparent); pointer-events: none; z-index: 10; box-shadow: 0 0 12px #22d3ee; }
-  .split-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(10,16,29,0.92); color: #d8b4fe; font-size: 10px; font-weight: bold; padding: 4px 12px; border-radius: 20px; border: 1px solid #a855f7; pointer-events: none; z-index: 11; box-shadow: 0 0 15px rgba(168,85,247,0.5); letter-spacing: 0.14em; }
+  .split-divider { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 2px; background: linear-gradient(to bottom, transparent, #22d3ee, transparent); pointer-events: none; z-index: 10; }
+  .split-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(10,16,29,0.92); color: #d8b4fe; font-size: 10px; font-weight: bold; padding: 4px 12px; border-radius: 4px; border: 1px solid #a855f7; pointer-events: none; z-index: 11; letter-spacing: 0.14em; }
 
   /* ============================================================================
      MODULE C — Planner footer expands for 30-day telemetry
@@ -140,13 +140,7 @@
   /* ============================================================================
      MODULE E — Public & Educator polish
      ============================================================================ */
-  @keyframes breathe {
-    0%, 100% { transform: scale(1); box-shadow: 0 0 32px rgba(34,211,238,0.35), inset 0 0 24px rgba(34,211,238,0.1); }
-    50%      { transform: scale(1.03); box-shadow: 0 0 48px rgba(34,211,238,0.55), inset 0 0 32px rgba(34,211,238,0.15); }
-  }
-  .score-circle { animation: breathe 3.6s ease-in-out infinite; }
-  .score-circle.power { animation-delay: 0.6s; }
-  .score-circle.comm  { animation-delay: 1.2s; }
+
 
   @keyframes storySlide {
     from { opacity: 0; transform: translateY(16px); }
@@ -191,20 +185,6 @@
 </style>
 </head>
 <body class="mode-planner">
-function nextWizard(step, profile) {
-  document.getElementById('wizard-step-1').classList.add('hidden');
-  document.getElementById('wizard-step-2').classList.remove('hidden');
-  document.getElementById('wizard-step-2').classList.add('flex');
-}
-function finishWizard() {
-  const pSite = document.getElementById('wizPrimarySite').value;
-  const tw = document.getElementById('wizTW').value;
-  Store.setState({ selectedSiteIds: [pSite], activeTW: tw, timeHours: 0 });
-  
-  const overlay = document.getElementById('wizard-overlay');
-  overlay.classList.add('opacity-0');
-  setTimeout(() => { overlay.style.display = 'none'; }, 700);
-}
  <!-- 🚀 WIZARD OVERLAY -->
 <div id="wizard-overlay" class="fixed inset-0 z-[99999] bg-[#0a0c10] flex flex-col items-center justify-center transition-opacity duration-700">
   <div class="absolute inset-0 bg-[url('https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lro_south_pole_1080p.jpg')] bg-cover bg-center opacity-20"></div>
@@ -416,11 +396,9 @@ function finishWizard() {
       </div>
 
       <!-- 数据溯源按钮 -->
-     <div id="missionAnalysisPanel" class="mt-2 pt-2 border-t border-slate-700/60">
-  <div class="text-[9px] uppercase tracking-widest text-slate-500 mb-1">MISSION ANALYSIS & NEXT STEPS</div>
-  <div id="aiSummaryText" class="text-[10px] text-slate-300 leading-snug p-2 bg-slate-900/60 border border-slate-700 rounded-md"></div>
-  <div id="aiTimelineText" class="mt-1 text-[9px] mono text-slate-400 bg-black/40 p-1.5 rounded-md"></div>
-</div>
+      <button id="btnOpenProvenance" style="display:none" onclick="document.getElementById('provenanceDrawer').classList.remove('translate-x-full'); renderProvenance();" class="mt-2 w-full py-1 text-[9px] font-bold tracking-widest text-cyan-400 border border-cyan-500/30 bg-cyan-500/10 rounded hover:bg-cyan-500/20">
+        📊 OPEN PROVENANCE DATA
+      </button>
       <button id="btnOpenProvenance" style="display:none" onclick="document.getElementById('provenanceDrawer').classList.remove('translate-x-full'); renderProvenance();" class="mt-2 w-full py-1 text-[9px] font-bold tracking-widest text-cyan-400 border border-cyan-500/30 bg-cyan-500/10 rounded hover:bg-cyan-500/20">
         📊 OPEN PROVENANCE DATA
       </button>
