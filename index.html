@@ -187,7 +187,7 @@
 <body class="mode-planner">
  <!-- 🚀 WIZARD OVERLAY -->
 <div id="wizard-overlay" class="fixed inset-0 z-[99999] bg-[#0a0c10] flex flex-col items-center justify-center transition-opacity duration-700">
-  <div class="absolute inset-0 bg-[url('https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lro_south_pole_1080p.jpg')] bg-cover bg-center opacity-20"></div>
+  <div class="absolute inset-0 bg-[url('lro_south_pole_1080p.jpg')] bg-cover bg-center opacity-20"></div>
   
   <div id="wizard-step-1" class="relative z-10 w-full max-w-4xl p-8 glass flex flex-col items-center">
     <h1 class="text-3xl text-cyan-300 font-bold tracking-widest mb-2 mono">LUNAR MISSION BROWSER</h1>
@@ -236,7 +236,7 @@
 <!-- HEADER -->
 <header class="site-header border-b border-cyan-500/20 bg-[#080f1c] px-4 flex items-center gap-4">
   <div class="flex items-center gap-3 shrink-0">
-    <div class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_12px_#22d3ee]"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-cyan-400"></div>
     <div>
       <h1 class="text-sm font-bold tracking-[0.22em] text-cyan-300">LUNAR MISSION BROWSER</h1>
       <div class="text-[10px] text-slate-400 tracking-widest">3D TERRAIN · SPLIT POV · EARTH OCCULTATION</div>
@@ -396,9 +396,6 @@
       </div>
 
       <!-- 数据溯源按钮 -->
-      <button id="btnOpenProvenance" style="display:none" onclick="document.getElementById('provenanceDrawer').classList.remove('translate-x-full'); renderProvenance();" class="mt-2 w-full py-1 text-[9px] font-bold tracking-widest text-cyan-400 border border-cyan-500/30 bg-cyan-500/10 rounded hover:bg-cyan-500/20">
-        📊 OPEN PROVENANCE DATA
-      </button>
       <button id="btnOpenProvenance" style="display:none" onclick="document.getElementById('provenanceDrawer').classList.remove('translate-x-full'); renderProvenance();" class="mt-2 w-full py-1 text-[9px] font-bold tracking-widest text-cyan-400 border border-cyan-500/30 bg-cyan-500/10 rounded hover:bg-cyan-500/20">
         📊 OPEN PROVENANCE DATA
       </button>
@@ -2545,8 +2542,8 @@ window.addEventListener('resize', () => {
   }
   updateUI();
 });
- <img id="imgLrocSurface" src="https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lro_south_pole_1080p.jpg" crossorigin="anonymous" style="display:none;">
-<img id="imgEarthTexture" src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/320px-The_Earth_seen_from_Apollo_17.jpg" crossorigin="anonymous" style="display:none;">
+ <img id="imgLrocSurface" src="lro_south_pole_1080p.jpg" style="display:none;">
+<img id="imgEarthTexture" src="The_Earth_seen_from_Apollo_17.jpg" style="display:none;">
 </script>
 </body>
 </html>
