@@ -1280,13 +1280,12 @@ function renderPOVCanvas(canvas, viewMode, renderSite) {
 
   // 2. 将视角投影转换为弧形（模拟广角天空穹顶）
   const arcX = az => W * 0.5 + (az / FOV) * (W * 0.45);
-  const arcY = (el, az) => {
-    // 基础高度映射
+const arcY = (el, az) => {
+    if (!isFinite(el)) el = allMin;   // ★ NaN 拦截，防止路径断裂
     const baseElY = H * 0.8 - ((el - allMin) / span) * (H * 0.6);
-    // 根据距离中心的视场角产生下垂（抛物线透视）
     const drop = Math.pow(az / FOV, 2) * (H * 0.15); 
     return baseElY + drop;
-  };
+};
 
   const aSunX = arcX(relSun), aSunY = arcY(sky.sunEl, relSun);
   const aEarthX = arcX(relEarth), aEarthY = arcY(sky.earthEl, relEarth);
@@ -1329,20 +1328,39 @@ function renderPOVCanvas(canvas, viewMode, renderSite) {
   ctx.lineTo(W, H);
   ctx.closePath();
   
-const imgSurf = document.getElementById('imgLrocSurface');
-  if (imgSurf && imgSurf.complete && imgSurf.naturalHeight !== 0 && !sky.isIllumInterruption && sky.sunOK) {
-    const horizonY = H * 0.8;
+// ★ P0-2: 优先 Apollo 平视全景（真实月面），fallback LROC 南极拼接图
+const imgApollo = document.getElementById('imgApolloSurface');
+const imgLroc   = document.getElementById('imgLrocSurface');
+let imgSurf = null;
+if (imgApollo && imgApollo.complete && imgApollo.naturalHeight !== 0) imgSurf = imgApollo;
+else if (imgLroc && imgLroc.complete && imgLroc.naturalHeight !== 0) imgSurf = imgLroc;
+
+const horizonY = H * 0.8;
+const isDark = (sky.sunFactor === 0);
+if (imgSurf && sky.sunOK) {
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, horizonY, W, H - horizonY);
     ctx.clip();
-    // 将图片拉伸铺设在地平线下方区域
-    ctx.drawImage(imgSurf, 0, 0, imgSurf.width, imgSurf.height * 0.5, 0, horizonY, W, H - horizonY);
+    // 保持宽高比居中裁剪，避免"地砖感"
+    const srcW = imgSurf.naturalWidth, srcH = imgSurf.naturalHeight;
+    const dstH = H - horizonY;
+    const dstW = dstH * (srcW / srcH);
+    ctx.drawImage(imgSurf, 0, 0, srcW, srcH, (W - dstW) / 2, horizonY, dstW, dstH);
+    // 光照因子调暗
+    const darkness = Math.max(0, 1 - sky.sunFactor) * 0.7;
+    if (darkness > 0.02) {
+        ctx.fillStyle = `rgba(0,0,0,${darkness.toFixed(2)})`;
+        ctx.fillRect(0, horizonY, W, H - horizonY);
+    }
+    // 与深空协调的轻暗化叠加
+    ctx.fillStyle = 'rgba(5, 9, 20, 0.30)';
+    ctx.fillRect(0, horizonY, W, H - horizonY);
     ctx.restore();
-  } else {
-    ctx.fillStyle = sky.isIllumInterruption ? '#0f0505' : '#0a0c10';
+} else {
+    ctx.fillStyle = isDark ? '#0f0505' : '#0a0c10';
     ctx.fill();
-  }
+}
   
   // 地形红线标识
   ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
@@ -1729,16 +1747,24 @@ function renderPlainEnglish(sc, sky) {
   const el = document.getElementById('plainEnglishText');
   if (!el) return;
   
-  const illum_pct = sc.power; // 这里用 power_pct 代表 illumination
+  const illumPct = sc.power;
+  const commPct  = sc.comm;
   
   if (sc.ec07_pass === false) {
-    el.innerHTML = `<span class="text-red-400 font-bold">⚠ High risk.</span> Illumination drops below threshold in this time window.`;
-  } else if (sc.comm < 50 && illum_pct > 50) {
-    el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Good sunlight,</span> but communication drops — relay may be needed.`;
-  } else if (sc.comm < 50) { 
-    el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Strong signals,</span> but sunlight drops during illumination interruptions.`;
+    // 状态 1：硬约束 No-Go
+    el.innerHTML = `<span class="text-red-400 font-bold">⚠ High risk (No-Go).</span> Sunlight drops below the mission threshold of 6.5 continuous days in this window.`;
+  } else if (commPct < 50 && illumPct >= 50) {
+    // 状态 2：光照好，但通信断
+    el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Good sunlight,</span> but direct-to-Earth communication drops — a relay satellite may be needed.`;
+  } else if (illumPct < 50 && commPct >= 50) {
+    // 状态 3：通信好，但光照断
+    el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Strong signal,</span> but sunlight is interrupted by terrain — expect battery cycling.`;
+  } else if (commPct < 50 && illumPct < 50) {
+    // 状态 4：双低
+    el.innerHTML = `<span class="text-red-400 font-bold">🔴 Both weak.</span> Sunlight and communication both score below 50 — this window is risky.`;
   } else {
-    el.innerHTML = `<span class="text-emerald-400 font-bold">🟢 All four dimensions</span> score well in this time window.`;
+    // 状态 5：全绿（保留作为兜底，不是审查要求的第 4 条）
+    el.innerHTML = `<span class="text-emerald-400 font-bold">🟢 All three dimensions</span> score well in this time window.`;
   }
 }
  
@@ -1786,9 +1812,6 @@ function renderPlannerRight() {
   }
   srcDiv.textContent = sourceText;
   
-  // 把 sky 的定义提前
-  const sky = computeSkyState(site, activeTW, timeHours);
-  generateMissionSummary(site, sc, sky);
 
   // --- 新增 B-6: 锚定值 UI 元素 ---
   let anchorDiv = document.getElementById('anchorValueText');
