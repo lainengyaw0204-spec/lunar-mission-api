@@ -583,8 +583,6 @@
     <div class="text-slate-600 text-[10px] mono" id="loadingElapsed">0.0s</div>
   </div>
 </div>
- <img id="imgLrocSurface" src="lro_south_pole_1080p.jpg" style="display:none;">
-<img id="imgEarthTexture" src="The_Earth_seen_from_Apollo_17.jpg" style="display:none;">
 
  <script>
 function nextWizard(type) {
@@ -1747,24 +1745,16 @@ function renderPlainEnglish(sc, sky) {
   const el = document.getElementById('plainEnglishText');
   if (!el) return;
   
-  const illumPct = sc.power;
-  const commPct  = sc.comm;
+  const illum_pct = sc.power; // 用 power_pct 代表 illumination
   
   if (sc.ec07_pass === false) {
-    // 状态 1：硬约束 No-Go
-    el.innerHTML = `<span class="text-red-400 font-bold">⚠ High risk (No-Go).</span> Sunlight drops below the mission threshold of 6.5 continuous days in this window.`;
-  } else if (commPct < 50 && illumPct >= 50) {
-    // 状态 2：光照好，但通信断
-    el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Good sunlight,</span> but direct-to-Earth communication drops — a relay satellite may be needed.`;
-  } else if (illumPct < 50 && commPct >= 50) {
-    // 状态 3：通信好，但光照断
-    el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Strong signal,</span> but sunlight is interrupted by terrain — expect battery cycling.`;
-  } else if (commPct < 50 && illumPct < 50) {
-    // 状态 4：双低
-    el.innerHTML = `<span class="text-red-400 font-bold">🔴 Both weak.</span> Sunlight and communication both score below 50 — this window is risky.`;
+    el.innerHTML = `<span class="text-red-400 font-bold">⚠ High risk.</span> Illumination drops below threshold in this time window.`;
+  } else if (sc.comm < 50 && illum_pct > 50) {
+    el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Good sunlight,</span> but communication drops — relay may be needed.`;
+  } else if (sc.comm < 50) {
+    el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Strong signals,</span> but sunlight drops during illumination interruptions.`;
   } else {
-    // 状态 5：全绿（保留作为兜底，不是审查要求的第 4 条）
-    el.innerHTML = `<span class="text-emerald-400 font-bold">🟢 All three dimensions</span> score well in this time window.`;
+    el.innerHTML = `<span class="text-emerald-400 font-bold">🟢 All four dimensions</span> score well in this time window.`;
   }
 }
  
@@ -2555,6 +2545,8 @@ window.addEventListener('resize', () => {
   updateUI();
 });
 </script>
+  <img id="imgLrocSurface" src="lro_south_pole_1080p.jpg" style="display:none;">
+<img id="imgEarthTexture" src="The_Earth_seen_from_Apollo_17.jpg" style="display:none;">
 </body>
 </html>
 
