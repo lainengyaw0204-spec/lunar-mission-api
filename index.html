@@ -221,7 +221,7 @@
 <div class="w-2.5 h-2.5 rounded-full bg-cyan-400"></div>
     <div>
       <h1 class="text-sm font-bold tracking-[0.22em] text-cyan-300">LUNAR MISSION BROWSER</h1>
-      <div class="text-[10px] text-slate-400 tracking-widest">3D TERRAIN · SPLIT POV · EARTH OCCULTATION</div>
+      <div class="text-[10px] text-slate-400 tracking-widest">3D TERRAIN · SPLIT POV · ILLUMINATION INTERRUPTION</div>
     </div>
   </div>
   <div class="flex items-center gap-1.5 mx-auto">
@@ -235,7 +235,7 @@
       <span id="apiStatusText" class="text-amber-300 font-bold">LOCAL ENGINE</span>
       <span class="text-slate-500 text-[9px]" id="apiLatency"></span>
     </div>
-    <button onclick="connectApi()" title="Probe SPICE Backend" class="px-2 py-1 rounded bg-cyan-500/15 border border-cyan-500/50 text-cyan-300 hover:bg-cyan-500/30 font-bold">↻ API</button>
+    <button onclick="connectApi(true)" title="Probe SPICE Backend" class="px-2 py-1 rounded bg-cyan-500/15 border border-cyan-500/50 text-cyan-300 hover:bg-cyan-500/30 font-bold">↻ API</button>
     <button onclick="toggleOrbitModal(true)" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400/60 text-purple-200 hover:bg-purple-500/35 font-bold">🌌 3D ORBIT</button>
   </div>
 </header>
@@ -279,7 +279,7 @@
       <div class="panel-title">◈ SCENARIO PRESETS</div>
       <div class="flex flex-col gap-1.5">
         <button onclick="selectPresetCase('good_both')" class="text-left px-2.5 py-1.5 rounded border border-emerald-500/35 bg-emerald-500/10 text-emerald-300 text-[11px] hover:bg-emerald-500/20 font-semibold">🟢 BEST: Sun + Comm (Malapert)</button>
-        <button onclick="selectPresetCase('occultation_case')" class="text-left px-2.5 py-1.5 rounded border border-purple-500/50 bg-purple-500/15 text-purple-200 text-[11px] hover:bg-purple-500/25 font-semibold">🟣 EARTH OCCULTATION (Gerlache)</button>
+        <button onclick="selectPresetCase('occultation_case')" class="text-left px-2.5 py-1.5 rounded border border-purple-500/50 bg-purple-500/15 text-purple-200 text-[11px] hover:bg-purple-500/25 font-semibold">🟣 ILLUMINATION INTERRUPTION (Gerlache)</button>
         <button onclick="selectPresetCase('bad_both')" class="text-left px-2.5 py-1.5 rounded border border-red-500/35 bg-red-500/10 text-red-300 text-[11px] hover:bg-red-500/20 font-semibold">🔴 HIGH RISK: Crater Rim (Shackleton)</button>
       </div>
     </div>
@@ -493,7 +493,7 @@
   <div class="flex items-center gap-2 flex-wrap">
     <div class="m-planner-flex items-center gap-2">
       <button id="playPauseBtn" onclick="togglePlay()" class="px-3 py-1 rounded bg-cyan-500/20 border border-cyan-400 text-cyan-300 text-[12px] font-bold hover:bg-cyan-500/35">▶ PLAY</button>
-      <button onclick="triggerOccultationMoment()" title="Jump to Earth Occultation" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px] font-bold hover:bg-purple-500/35">🌑 OCCULTATION</button>
+      <button onclick="triggerOccultationMoment()" title="Jump to Illumination Interruption" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px] font-bold hover:bg-purple-500/35">🌑 INTERRUPTION</button>
       <select id="playSpeed" class="bg-slate-900 border border-slate-700 text-cyan-300 text-[11px] rounded px-1.5 py-1 mono">
         <option value="0.5">0.5×</option>
         <option value="1" selected>1.0×</option>
@@ -503,11 +503,11 @@
     </div>
     <div class="m-educator-flex items-center gap-2">
       <button id="playPauseBtnEdu" onclick="togglePlay()" class="px-3 py-1 rounded bg-cyan-500/20 border border-cyan-400 text-cyan-300 text-[12px] font-bold hover:bg-cyan-500/35">▶ PLAY</button>
-      <button onclick="triggerOccultationMoment()" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px] font-bold hover:bg-purple-500/35">🌑 JUMP TO OCCULTATION</button>
+      <button onclick="triggerOccultationMoment()" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px] font-bold hover:bg-purple-500/35">🌑 JUMP TO INTERRUPTION</button>
     </div>
     <div class="m-public-flex items-center gap-3 w-full justify-center">
       <button id="playPauseBtnPub" onclick="togglePlay()" class="big-play">▶ PLAY 30-DAY WINDOW</button>
-      <button onclick="triggerOccultationMoment()" class="px-4 py-2.5 rounded-full bg-purple-600/30 border border-purple-400 text-purple-200 font-bold text-sm">🌑 SEE OCCULTATION</button>
+      <button onclick="triggerOccultationMoment()" class="px-4 py-2.5 rounded-full bg-purple-600/30 border border-purple-400 text-purple-200 font-bold text-sm">🌑 SEE INTERRUPTION</button>
     </div>
     <div class="m-planner-flex m-educator-flex flex-1 items-center justify-between text-[11px] mono gap-3 ml-2">
       <span class="text-slate-400">WINDOW TIME <strong id="timeReadout" class="text-cyan-300">T + 216.0 h</strong></span>
@@ -533,7 +533,7 @@
       <div class="flex items-center gap-3 text-slate-400">
         <span><span class="inline-block w-3 h-0.5 bg-purple-400 align-middle"></span> Battery SOC %</span>
         <span><span class="inline-block w-3 border-t border-dashed border-cyan-300 align-middle"></span> SNR dB</span>
-        <span><span class="inline-block w-2 h-2 bg-purple-500/40 align-middle"></span> Earth Occultation</span>
+        <span><span class="inline-block w-2 h-2 bg-purple-500/40 align-middle"></span> Illumination Interruption</span>
       </div>
     </div>
     <canvas id="telemetryCanvas" class="flex-1 block w-full"></canvas>
@@ -550,7 +550,7 @@
         <div class="text-[10px] text-slate-400">Drag to rotate · Scroll to zoom · Purple cone = Earth Umbra (Occultation Shadow Zone)</div>
       </div>
       <div class="flex items-center gap-2">
-        <button onclick="triggerOccultationMoment(); updateOrbitScene();" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px]">🌑 Snap to Occultation Alignment</button>
+        <button onclick="triggerOccultationMoment(); updateOrbitScene();" class="px-2.5 py-1 rounded bg-purple-500/20 border border-purple-400 text-purple-200 text-[11px]">🌑 Snap to Interruption Alignment</button>
         <button onclick="toggleOrbitModal(false)" class="px-2.5 py-1 rounded bg-slate-800 border border-slate-600 text-slate-300 text-[11px] hover:bg-slate-700">✕ CLOSE</button>
       </div>
     </div>
@@ -841,15 +841,15 @@ async function apiPost(twId) {
   return data;
 }
 
-async function connectApi() {
+async function connectApi(isManual = false) {
   setApiStatus('probing');
-  showLoading();                    // ← MODULE B
+  if (isManual) showLoading();                    
   try {
     const data = await apiPost('TW-1');
     ingestApiResults(data.results, 'TW-1');
     API.live = true;
     setApiStatus('live');
-    hideLoading();                  // ← MODULE B
+    if (isManual) hideLoading();                  
     // 后台预取其余 TW，不阻塞首屏
     ['TW-2', 'TW-3', 'TW-4'].forEach(tw => prefetchTw(tw));
     updateUI();
@@ -857,7 +857,7 @@ async function connectApi() {
     console.warn('API connect failed:', e);
     API.live = false;
     setApiStatus('offline');
-    hideLoading();                  // ← MODULE B
+    if (isManual) hideLoading();                  
     updateUI();
   }
 }
@@ -1776,7 +1776,9 @@ function renderPlannerRight() {
   
   const totalEl = document.getElementById('scoreTotal');
   if (sc.ec07_pass === null) {
-    totalEl.textContent = '—'; totalEl.style.color = '#94a3b8'; document.getElementById('scoreAssess').textContent = 'EC-07 unavailable';
+    totalEl.textContent = sc.total.toFixed(0);             // ← 修改点：展示本地估算分数
+    totalEl.style.color = scoreColor(sc.total);            // ← 修改点：使用分数匹配颜色
+    document.getElementById('scoreAssess').textContent = 'Local Estimate'; // ← 修改点：加入离线兜底标识
   } else if (sc.ec07_pass === false) {
     totalEl.textContent = '0'; totalEl.style.color = '#ef4444'; document.getElementById('scoreAssess').textContent = 'No-Go'; document.getElementById('scoreAssess').classList.add('pulse-red');
   } else {
@@ -1925,7 +1927,7 @@ function renderEducatorRight() {
 
   const badge = document.getElementById('povLiveBadgeEdu');
   if (badge) {
-    if (sky.isEarthOccultation) { badge.textContent = '🌑 OCCULTATION MOMENT'; badge.className = 'text-[10px] px-2 py-0.5 rounded bg-purple-500/30 border border-purple-400 text-purple-200 mono font-bold edu-tip'; }
+    sunSt.textContent = if (sky.isEarthOccultation) { badge.textContent = '🌑 INTERRUPTION MOMENT';.isEarthOccultation ? '🌑 INTERRUPTION' : (sky.sunOK ? '✓ SUNLIT' : '⚠ SHADOW');; badge.className = 'text-[10px] px-2 py-0.5 rounded bg-purple-500/30 border border-purple-400 text-purple-200 mono font-bold edu-tip'; }
     else if (!sky.earthOK || sky.sunFactor === 0) { badge.textContent = '⚠ WATCH THIS SHADOW'; badge.className = 'text-[10px] px-2 py-0.5 rounded bg-amber-500/25 border border-amber-400 text-amber-200 mono font-bold edu-tip'; }
     else { badge.textContent = '✓ REAL-TIME GEOMETRY'; badge.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-800 text-cyan-300 mono'; }
   }
@@ -1944,7 +1946,7 @@ function renderPublic() {
   if (!card || !iconEl || !titleEl || !bodyEl) return;
 
   let icon = '🌙', title = '', body = '', accent = 'emerald';
-  if (sky.isEarthOccultation) { icon = '🌑'; title = 'Earth is Occulting the Sun'; body = 'This is the Earth Occultation Paradox — solar power drops to <b class="text-red-400">0%</b>, yet Earth is closer to the sky than ever.'; accent = 'purple'; }
+  if (sky.isEarthOccultation) { icon = '🌑'; title = 'Earth is Blocking the Sun'; body = 'This is the Illumination Interruption Paradox — solar power drops to <b class="text-red-400">0%</b>, yet Earth is closer to the sky than ever.'; accent = 'purple'; }
   else if (!sky.commActive && sky.sunFactor === 0) { icon = '🔴'; title = 'Total Blackout'; body = 'A mountain ridge blocks both the Sun and Earth. The lander is on battery power with no signal.'; accent = 'red'; }
   else if (!sky.commActive) { icon = '🟡'; title = 'Signal Blocked by Mountain'; body = `A ridge of <b>+${sky.maskAtEarth.toFixed(1)}°</b> stands taller than Earth's elevation. Solar panels still charge, but the radio is cut off.`; accent = 'amber'; }
   else if (sky.sunFactor === 0) { icon = '⚡'; title = 'In Crater Shadow'; body = `The crater wall hides the low-angle Sun. Running on battery, but radio contact is healthy.`; accent = 'amber'; }
@@ -1968,7 +1970,7 @@ function renderFooter() {
 
   const phase = document.getElementById('phaseText');
   if (phase) {
-    if (sky.isEarthOccultation) { phase.textContent = '🟣 EARTH OCCULTATION (POWER 0% / COMM 100%)'; phase.className = 'text-purple-300 font-bold'; }
+    if (sky.isEarthOccultation) { phase.textContent = '🟣 ILLUMINATION INTERRUPTION (POWER 0% / COMM 100%)'; phase.className = 'text-purple-300 font-bold'; }
     else if (!sky.commActive && sky.sunFactor === 0) { phase.textContent = '🔴 TOTAL BLACKOUT'; phase.className = 'text-red-400 font-bold'; }
     else if (!sky.commActive) { phase.textContent = '🟡 COMM BLOCKED BY MOUNTAIN'; phase.className = 'text-amber-300 font-bold'; }
     else if (sky.sunFactor === 0) { phase.textContent = '⚡ TERRAIN SHADOW'; phase.className = 'text-amber-300 font-bold'; }
@@ -2116,7 +2118,7 @@ function updateOrbitScene() {
 
   const illumEl = document.getElementById('moonIllumStatus'), umbraEl = document.getElementById('moonUmbraPct');
   if (illumEl && umbraEl) {
-    if (inUmbra) { illumEl.textContent = '🌑 EARTH OCCULTATION'; illumEl.className = 'text-red-400 font-bold'; }
+    if (inUmbra) { illumEl.textContent = '🌑 ILLUMINATION INTERRUPTION'; illumEl.className = 'text-red-400 font-bold'; }
     else { illumEl.textContent = '☀️ SUNLIT'; illumEl.className = 'text-emerald-300 font-bold'; }
     umbraEl.textContent = Math.round(umbraCoverage * 100) + '%';
     umbraEl.className = umbraCoverage > 0.35 ? 'text-red-300 font-bold' : umbraCoverage > 0.05 ? 'text-amber-300' : 'text-slate-400';
@@ -2131,7 +2133,7 @@ function updatePOVLabels(site, idx) {
   const sky = computeSkyState(site, activeTW, timeHours);
   const sunSt = document.getElementById(`povSunStatus${idx}`);
   if (sunSt) {
-    sunSt.textContent = sky.isEarthOccultation ? '🌑 OCCULTATION' : (sky.sunOK ? '✓ SUNLIT' : '⚠ SHADOW');
+    sunSt.textContent = sky.isEarthOccultation ? '🌑 INTERRUPTION' : (sky.sunOK ? '✓ SUNLIT' : '⚠ SHADOW');
     sunSt.className = sky.isEarthOccultation ? 'text-[9px] mono text-purple-300 ml-1' : (sky.sunOK ? 'text-[9px] mono text-emerald-300 ml-1' : 'text-[9px] mono text-red-400 ml-1');
   }
   const earthSt = document.getElementById(`povEarthStatus${idx}`);
@@ -2159,12 +2161,15 @@ function updateUI() {
   renderTWList();
   renderFooter();
 
-  if (mode === 'planner') {
+ if (mode === 'planner') {
     if (moonView === '2d') drawMoon2DMapPlanner();
     else updateMoon3DTerrain();
     
     // 动态挂载 1x2 或 2x2 POV 布局
     const r1 = document.getElementById('povRow1'), r2 = document.getElementById('povRow2');
+    const divider = document.querySelector('.split-divider'); // ← 新增
+    const pLabel1 = document.getElementById('paradoxLabel1'); // ← 新增
+    
     if (r1 && r2) {
       const s1 = SITES.find(s => s.id === selectedSiteIds[0]) || SITES[0];
       renderPOVCanvas(document.getElementById('povSun1'), 'sun', s1);
@@ -2173,12 +2178,16 @@ function updateUI() {
       
       if (selectedSiteIds.length > 1) {
         r2.classList.remove('hidden');
+        if (divider) divider.style.display = 'block'; // ← 修改点
+        if (pLabel1) pLabel1.style.display = 'block'; // ← 修改点
         const s2 = SITES.find(s => s.id === selectedSiteIds[1]);
         renderPOVCanvas(document.getElementById('povSun2'), 'sun', s2);
         renderPOVCanvas(document.getElementById('povEarth2'), 'earth', s2);
         updatePOVLabels(s2, 2);
       } else {
         r2.classList.add('hidden');
+        if (divider) divider.style.display = 'none';  // ← 修改点
+        if (pLabel1) pLabel1.style.display = 'none';  // ← 修改点
       }
     }
     renderPlannerRight();
@@ -2222,7 +2231,8 @@ function updateUI() {
   if (btnProv) btnProv.style.display = depth === 'L3' ? 'block' : 'none';
 }
 function selectPresetCase(key) {
-  if (key === 'occultation_case') {
+  // 修改点：加入 interruption_case 兼容 Wizard 的调用
+  if (key === 'occultation_case' || key === 'interruption_case') {
     Store.setState({ activeTW: 'TW-1', selectedSiteIds: ['gerlache'], timeHours: findOccultationHourForSite(SITES.find(s => s.id === 'gerlache'), 'TW-1') });
   } else if (key === 'good_both') {
     Store.setState({ selectedSiteIds: ['malapert'], timeHours: 48 });
@@ -2497,7 +2507,7 @@ window.addEventListener('load', () => {
       }
       const phase = document.getElementById('phaseText');
       if (phase) {
-        if (sky.isEarthOccultation) { phase.textContent = '🟣 EARTH OCCULTATION (POWER 0% / COMM 100%)'; phase.className = 'text-purple-300 font-bold'; }
+        if (sky.isEarthOccultation) { phase.textContent = '🟣 ILLUMINATION INTERRUPTION (POWER 0% / COMM 100%)'; phase.className = 'text-purple-300 font-bold'; }
         else if (!sky.commActive && sky.sunFactor === 0) { phase.textContent = '🔴 TOTAL BLACKOUT'; phase.className = 'text-red-400 font-bold'; }
         else if (!sky.commActive) { phase.textContent = '🟡 COMM BLOCKED BY MOUNTAIN'; phase.className = 'text-amber-300 font-bold'; }
         else if (sky.sunFactor === 0) { phase.textContent = '⚡ TERRAIN SHADOW'; phase.className = 'text-amber-300 font-bold'; }
