@@ -1925,11 +1925,17 @@ function renderEducatorRight() {
     } else { callout.classList.add('hidden'); }
   }
 
-  const badge = document.getElementById('povLiveBadgeEdu');
-  if (badge) {
-    sunSt.textContent = if (sky.isEarthOccultation) { badge.textContent = '🌑 INTERRUPTION MOMENT';.isEarthOccultation ? '🌑 INTERRUPTION' : (sky.sunOK ? '✓ SUNLIT' : '⚠ SHADOW');; badge.className = 'text-[10px] px-2 py-0.5 rounded bg-purple-500/30 border border-purple-400 text-purple-200 mono font-bold edu-tip'; }
-    else if (!sky.earthOK || sky.sunFactor === 0) { badge.textContent = '⚠ WATCH THIS SHADOW'; badge.className = 'text-[10px] px-2 py-0.5 rounded bg-amber-500/25 border border-amber-400 text-amber-200 mono font-bold edu-tip'; }
-    else { badge.textContent = '✓ REAL-TIME GEOMETRY'; badge.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-800 text-cyan-300 mono'; }
+ const badge = document.getElementById('povLiveBadgeEdu');
+if (badge) {
+  if (sky.isEarthOccultation) { 
+    badge.textContent = '🌑 INTERRUPTION MOMENT'; 
+    badge.className = 'text-[10px] px-2 py-0.5 rounded bg-purple-500/30 border border-purple-400 text-purple-200 mono font-bold edu-tip'; 
+  } else if (!sky.earthOK || sky.sunFactor === 0) { 
+    badge.textContent = '⚠ WATCH THIS SHADOW'; 
+    badge.className = 'text-[10px] px-2 py-0.5 rounded bg-amber-500/25 border border-amber-400 text-amber-200 mono font-bold edu-tip'; 
+  } else { 
+    badge.textContent = '✓ REAL-TIME GEOMETRY'; 
+    badge.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-800 text-cyan-300 mono'; 
   }
 }
 
@@ -2141,10 +2147,10 @@ function updatePOVLabels(site, idx) {
     earthSt.textContent = sky.earthOK ? '✓ LINK OK' : '⚠ OCCULTED';
     earthSt.className = sky.earthOK ? 'text-[9px] mono text-cyan-300 ml-1' : 'text-[9px] mono text-red-400 ml-1';
   }
-  const pLabel = document.getElementById(`paradoxLabel${idx}`);
+const pLabel = document.getElementById(`paradoxLabel${idx}`);
   if (pLabel) {
     if (sky.isEarthOccultation) {
-      pLabel.style.background = 'rgba(147, 51, 234, 0.95)'; pLabel.style.color = '#fff'; pLabel.textContent = `POV ${idx}: EARTH OCCULTATION`;
+      pLabel.style.background = 'rgba(147, 51, 234, 0.95)'; pLabel.style.color = '#fff'; pLabel.textContent = `POV ${idx}: ILLUMINATION INTERRUPTION`;
     } else {
       pLabel.style.background = 'rgba(10, 16, 29, 0.92)'; pLabel.style.color = '#d8b4fe'; pLabel.textContent = `POV ${idx}: ${site.name.toUpperCase()}`;
     }
@@ -2555,8 +2561,9 @@ window.addEventListener('resize', () => {
   updateUI();
 });
 </script>
-  <img id="imgLrocSurface" src="lro_south_pole_1080p.jpg" style="display:none;">
+<img id="imgLrocSurface" src="lro_south_pole_1080p.jpg" style="display:none;">
 <img id="imgEarthTexture" src="The_Earth_seen_from_Apollo_17.jpg" style="display:none;">
+<img id="imgApolloSurface" src="apollo_surface_panorama.jpg" style="display:none;">
 </body>
 </html>
 
