@@ -205,7 +205,8 @@
       <button onclick="nextWizard('timewindows')" class="p-6 border border-slate-600 hover:border-cyan-400 bg-slate-900/80 rounded-md text-center transition-colors">
         <div class="text-xl mb-3 font-mono text-cyan-400">TW-1 ↔ TW-3</div>
         <div class="text-cyan-300 font-bold mb-1">Compare Time Windows</div>
-        <div class="text-[10px] text-slate-500">Same site, different dates</div>
+        <!-- 修改点：更新下方描述文案 -->
+        <div class="text-[10px] text-slate-500">Use 4x4 Matrix to compare dates</div>
       </button>
       <button onclick="nextWizard('scenarios')" class="p-6 border border-slate-600 hover:border-cyan-400 bg-slate-900/80 rounded-md text-center transition-colors">
         <div class="text-xl mb-3 font-mono text-cyan-400">📋</div>
@@ -1917,11 +1918,12 @@ function renderEducatorRight() {
   const html = steps.map(s => `<div class="edu-step ${s.cls}"><div class="edu-step-title" style="color: ${s.cls === 'what' ? '#22d3ee' : s.cls === 'why' ? '#a855f7' : '#facc15'}">${s.title}</div><div class="edu-step-body">${s.body}</div></div>`).join('');
   const eduExplain = document.getElementById('eduExplain'); if (eduExplain) { eduExplain.classList.remove('text-[12px]', 'leading-relaxed'); eduExplain.innerHTML = html; }
 
-  const callout = document.getElementById('occultationCalloutEdu');
+const callout = document.getElementById('occultationCalloutEdu');
   if (callout) {
     if (sky.isEarthOccultation) {
       callout.classList.remove('hidden');
-      callout.innerHTML = `<div class="text-3xl mb-1">🌑</div><div class="text-lg font-bold text-purple-200 tracking-wider">EARTH OCCULTATION</div><div class="text-xs text-slate-300 mb-2">Earth Occults the Sun</div><div class="grid grid-cols-2 gap-3 text-center text-xs mono"><div><div class="text-slate-400 text-[9px]">SOLAR POWER</div><div class="text-red-400 text-base font-bold">0%</div></div><div><div class="text-slate-400 text-[9px]">EARTH COMM</div><div class="text-cyan-300 text-base font-bold">100%</div></div></div>`;
+      // 修改点：EARTH OCCULTATION -> ILLUMINATION INTERRUPTION, Earth Occults the Sun -> Earth blocks the Sun
+      callout.innerHTML = `<div class="text-3xl mb-1">🌑</div><div class="text-lg font-bold text-purple-200 tracking-wider">ILLUMINATION INTERRUPTION</div><div class="text-xs text-slate-300 mb-2">Earth blocks the Sun</div><div class="grid grid-cols-2 gap-3 text-center text-xs mono"><div><div class="text-slate-400 text-[9px]">SOLAR POWER</div><div class="text-red-400 text-base font-bold">0%</div></div><div><div class="text-slate-400 text-[9px]">EARTH COMM</div><div class="text-cyan-300 text-base font-bold">100%</div></div></div>`;
     } else { callout.classList.add('hidden'); }
   }
 
@@ -2095,6 +2097,7 @@ function toggleOrbitModal(open) {
 
 function updateOrbitScene() {
   if (!orbitRenderer) return;
+  if (!earthMesh || !moonMesh) return; // ← 新增：确保模型已加载完毕，防止读取 undefined 导致崩溃
   const { activeTW, timeHours } = Store.getState();
   const tAbs = (TW_T0[activeTW] || 0) + timeHours;
   const geAbs = (TW_T0['TW-1'] || 0) + getGlobalOccultationHour();
@@ -2102,8 +2105,13 @@ function updateOrbitScene() {
   const rO = 9.5, inc = PHYS.lunarInclinationDeg * Math.PI / 180;
 
   const mx = Math.cos(ang) * rO, my = Math.sin(ang) * rO * Math.sin(inc), mz = Math.sin(ang) * rO;
-  moonGroup.position.set(mx, my, mz); moonGroup.rotation.y = -ang; earthMesh.rotation.y = (tAbs / 24.0) * Math.PI * 2;
-
+  if (moonGroup) {
+    moonGroup.position.set(mx, my, mz); 
+    moonGroup.rotation.y = -ang; 
+  }
+  if (earthMesh) { // ← 新增：加一层安全包裹
+    earthMesh.rotation.y = (tAbs / 24.0) * Math.PI * 2;
+  }
   const UMBRA_LEN = 14, UMBRA_BASE_R = 2.1, MOON_R = 0.55;
   let inUmbra = false, umbraCoverage = 0;
   if (mx > 0 && mx < UMBRA_LEN) {
