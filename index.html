@@ -191,45 +191,26 @@
   
   <div id="wizard-step-1" class="relative z-10 w-full max-w-4xl p-8 glass flex flex-col items-center">
     <h1 class="text-3xl text-cyan-300 font-bold tracking-widest mb-2 mono">LUNAR MISSION BROWSER</h1>
-    <h2 class="text-sm text-slate-400 tracking-[0.2em] mb-10 uppercase">Step 1: Select Mission Profile</h2>
-    <div class="grid grid-cols-3 gap-6 w-full">
-      <button onclick="nextWizard()" class="p-6 border border-slate-600 hover:border-cyan-400 bg-slate-900/80 rounded-md text-center transition-colors">
-        <div class="text-2xl mb-3">🏗️</div>
-        <div class="text-cyan-300 font-bold mb-1">Moon Base</div>
-        <div class="text-[10px] text-slate-500">Long-term habitation</div>
-      </button>
-      <button onclick="nextWizard()" class="p-6 border border-slate-600 hover:border-cyan-400 bg-slate-900/80 rounded-md text-center transition-colors">
-        <div class="text-2xl mb-3">💧</div>
-        <div class="text-cyan-300 font-bold mb-1">Ice Prospecting</div>
-        <div class="text-[10px] text-slate-500">Resource utilization</div>
-      </button>
-      <button onclick="nextWizard()" class="p-6 border border-slate-600 hover:border-cyan-400 bg-slate-900/80 rounded-md text-center transition-colors">
-        <div class="text-2xl mb-3">🔨</div>
-        <div class="text-cyan-300 font-bold mb-1">Geological Survey</div>
-        <div class="text-[10px] text-slate-500">Sample return</div>
-      </button>
-    </div>
-  </div>
+    <h2 class="text-sm text-slate-400 tracking-[0.2em] mb-2 uppercase">Step 1: Choose what to compare</h2>
+    <p class="text-base text-cyan-200 mb-1 font-semibold">Compare landing sites — across places, across time windows.</p>
+    <p class="text-xs text-slate-400 mb-8 mono">See which site is safer, and when.</p>
 
-  <div id="wizard-step-2" class="relative z-10 w-full max-w-xl p-8 glass hidden flex-col items-center">
-    <h2 class="text-sm text-slate-400 tracking-[0.2em] mb-6 uppercase">Step 2: Target Selection</h2>
-    <div class="w-full flex flex-col gap-4">
-      <div>
-        <label class="text-[10px] text-slate-400 uppercase tracking-widest">Primary Site</label>
-        <select id="wizPrimarySite" class="w-full mt-1 bg-slate-900 border border-slate-600 text-cyan-200 p-2 rounded text-sm mono focus:outline-none focus:border-cyan-400">
-          <option value="gerlache">de Gerlache Rim 2</option>
-          <option value="malapert">Malapert Massif</option>
-          <option value="shackleton">Shackleton Rim</option>
-        </select>
-      </div>
-      <div>
-        <label class="text-[10px] text-slate-400 uppercase tracking-widest">Time Window</label>
-        <select id="wizTW" class="w-full mt-1 bg-slate-900 border border-slate-600 text-cyan-200 p-2 rounded text-sm mono focus:outline-none focus:border-cyan-400">
-          <option value="TW-1">TW-1 (Sep 2028)</option>
-          <option value="TW-2">TW-2 (Dec 2028)</option>
-        </select>
-      </div>
-      <button onclick="finishWizard()" class="mt-6 w-full py-3 bg-cyan-600/30 border border-cyan-400 text-cyan-100 font-bold tracking-widest text-sm rounded hover:bg-cyan-600/50">INITIALIZE WORKSPACE</button>
+    <div class="grid grid-cols-3 gap-4 w-full">
+      <button onclick="nextWizard('locations')" class="p-6 border border-slate-600 hover:border-cyan-400 bg-slate-900/80 rounded-md text-center transition-colors">
+        <div class="text-xl mb-3 font-mono text-cyan-400">A ↔ B</div>
+        <div class="text-cyan-300 font-bold mb-1">Compare Locations</div>
+        <div class="text-[10px] text-slate-500">Same time window, different sites</div>
+      </button>
+      <button onclick="nextWizard('timewindows')" class="p-6 border border-slate-600 hover:border-cyan-400 bg-slate-900/80 rounded-md text-center transition-colors">
+        <div class="text-xl mb-3 font-mono text-cyan-400">TW-1 ↔ TW-3</div>
+        <div class="text-cyan-300 font-bold mb-1">Compare Time Windows</div>
+        <div class="text-[10px] text-slate-500">Same site, different dates</div>
+      </button>
+      <button onclick="nextWizard('scenarios')" class="p-6 border border-slate-600 hover:border-cyan-400 bg-slate-900/80 rounded-md text-center transition-colors">
+        <div class="text-xl mb-3 font-mono text-cyan-400">📋</div>
+        <div class="text-cyan-300 font-bold mb-1">Browse Example Scenarios</div>
+        <div class="text-[10px] text-slate-500">Pre-built comparisons</div>
+      </button>
     </div>
   </div>
 </div>
@@ -387,6 +368,8 @@
         </div>
         <div id="ecGateList" class="grid grid-cols-2 gap-1 text-[9px] mono"></div>
       </div>
+      <!-- 🚀 新增：大白话解释模块 -->
+      <div id="plainEnglishText" class="mt-3 p-2 bg-slate-900 rounded text-sm leading-tight"></div>
 
       <!-- 🚀 新增：Mission Analysis AI Panel -->
       <div id="missionAnalysisPanel" class="mt-2 pt-2 border-t border-slate-700/60">
@@ -606,19 +589,18 @@
     <div class="text-slate-600 text-[10px] mono" id="loadingElapsed">0.0s</div>
   </div>
 </div>
+
+<script>
  <img id="imgLrocSurface" src="lro_south_pole_1080p.jpg" style="display:none;">
 <img id="imgEarthTexture" src="The_Earth_seen_from_Apollo_17.jpg" style="display:none;">
-<script>
-function nextWizard(step, profile) {
-  document.getElementById('wizard-step-1').classList.add('hidden');
-  document.getElementById('wizard-step-2').classList.remove('hidden');
-  document.getElementById('wizard-step-2').classList.add('flex');
-}
-
-function finishWizard() {
-  const pSite = document.getElementById('wizPrimarySite').value;
-  const tw = document.getElementById('wizTW').value;
-  Store.setState({ selectedSiteIds: [pSite], activeTW: tw, timeHours: 0 });
+function nextWizard(type) {
+  if (type === 'locations') {
+    Store.setState({ selectedSiteIds: ['malapert', 'shackleton'], activeTW: 'TW-1', timeHours: 0 });
+  } else if (type === 'timewindows') {
+    Store.setState({ selectedSiteIds: ['malapert'], activeTW: 'TW-1', timeHours: 0 });
+  } else if (type === 'scenarios') {
+    selectPresetCase('interruption_case');
+  }
   const overlay = document.getElementById('wizard-overlay');
   overlay.classList.add('opacity-0');
   setTimeout(() => { overlay.style.display = 'none'; }, 700);
@@ -1768,6 +1750,24 @@ function generateMissionSummary(site, sc, sky) {
     <div>Day ${Math.floor(twDays * 0.7)+1}+: Data Uplink Window</div>
   `;
 }
+
+ function renderPlainEnglish(sc, sky) {
+  const el = document.getElementById('plainEnglishText');
+  if (!el) return;
+  
+  const illum_pct = sc.power; // 这里用 power_pct 代表 illumination
+  
+  if (sc.ec07_pass === false) {
+    el.innerHTML = `<span class="text-red-400 font-bold">⚠ High risk.</span> Illumination drops below threshold in this time window.`;
+  } else if (sc.comm < 50 && illum_pct > 50) {
+    el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Good sunlight,</span> but communication drops — relay may be needed.`;
+  } else if (sc.comm < 50) { // 剩下的通信差的情况
+    el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Strong signals,</span> but sunlight drops during illumination interruptions.`;
+  } else {
+    el.innerHTML = `<span class="text-emerald-400 font-bold">🟢 All four dimensions</span> score well in this time window.`;
+  }
+}
+ 
 function renderPlannerRight() {
   const { activeTW, timeHours } = Store.getState();
   const site = getSite(); 
@@ -1829,8 +1829,12 @@ function renderPlannerRight() {
   document.getElementById('seSunAz').textContent = `Az ${sky.sunAz.toFixed(1)}°`; document.getElementById('seSunEl').textContent = `El ${sky.sunEl.toFixed(2)}° (Mask +${sky.maskAtSun.toFixed(1)}°)`;
   document.getElementById('seEarthAz').textContent = `Az ${sky.earthAz.toFixed(1)}°`; document.getElementById('seEarthEl').textContent = `El ${sky.earthEl.toFixed(2)}° (Mask +${sky.maskAtEarth.toFixed(1)}°)`;
 
-  drawHorizonRadar(document.getElementById('horizonRadarPlanner'), document.getElementById('horizonPeakNote'));
+drawHorizonRadar(document.getElementById('horizonRadarPlanner'), document.getElementById('horizonPeakNote'));
   renderEcPanel();
+  renderPlainEnglish(sc, sky); // 追加调用
+  renderMatrix();
+  renderTradeSpace();
+}
   
   // 生成 AI 总结分析
   const twDays = TW_DURATION[activeTW] / 24;
@@ -1854,9 +1858,7 @@ function renderPlannerRight() {
     `;
   }
 
-  renderMatrix();
-  renderTradeSpace();
-}
+
 function renderMatrix() {
   const el = document.getElementById('matrixPlanner'); if (!el) return;
   const { selectedSiteIds, activeTW } = Store.getState();
