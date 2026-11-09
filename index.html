@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LUNAR MISSION BROWSER · 3D Cockpit v10 Final Release</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script> 
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <style>
  /* === B-3 色盲模式基建 (CSS 变量) === */
   :root {
@@ -1328,14 +1329,20 @@ function renderPOVCanvas(canvas, viewMode, renderSite) {
   ctx.lineTo(W, H);
   ctx.closePath();
   
-  const imgSurf = document.getElementById('imgLrocSurface');
-  if (imgSurf && imgSurf.complete && imgSurf.naturalHeight !== 0 && !sky.isEarthOccultation && sky.sunOK) {
-    const pat = ctx.createPattern(imgSurf, 'repeat');
-    ctx.fillStyle = pat;
+const imgSurf = document.getElementById('imgLrocSurface');
+  if (imgSurf && imgSurf.complete && imgSurf.naturalHeight !== 0 && !sky.isIllumInterruption && sky.sunOK) {
+    const horizonY = H * 0.8;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, horizonY, W, H - horizonY);
+    ctx.clip();
+    // 将图片拉伸铺设在地平线下方区域
+    ctx.drawImage(imgSurf, 0, 0, imgSurf.width, imgSurf.height * 0.5, 0, horizonY, W, H - horizonY);
+    ctx.restore();
   } else {
-    ctx.fillStyle = sky.isEarthOccultation ? '#0f0505' : '#0a0c10';
+    ctx.fillStyle = sky.isIllumInterruption ? '#0f0505' : '#0a0c10';
+    ctx.fill();
   }
-  ctx.fill();
   
   // 地形红线标识
   ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
@@ -1728,24 +1735,7 @@ function renderPlainEnglish(sc, sky) {
     el.innerHTML = `<span class="text-red-400 font-bold">⚠ High risk.</span> Illumination drops below threshold in this time window.`;
   } else if (sc.comm < 50 && illum_pct > 50) {
     el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Good sunlight,</span> but communication drops — relay may be needed.`;
-  } else if (sc.comm < 50) {
-    el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Strong signals,</span> but sunlight drops during illumination interruptions.`;
-  } else {
-    el.innerHTML = `<span class="text-emerald-400 font-bold">🟢 All four dimensions</span> score well in this time window.`;
-  }
-}
-
- function renderPlainEnglish(sc, sky) {
-  const el = document.getElementById('plainEnglishText');
-  if (!el) return;
-  
-  const illum_pct = sc.power; // 这里用 power_pct 代表 illumination
-  
-  if (sc.ec07_pass === false) {
-    el.innerHTML = `<span class="text-red-400 font-bold">⚠ High risk.</span> Illumination drops below threshold in this time window.`;
-  } else if (sc.comm < 50 && illum_pct > 50) {
-    el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Good sunlight,</span> but communication drops — relay may be needed.`;
-  } else if (sc.comm < 50) { // 剩下的通信差的情况
+  } else if (sc.comm < 50) { 
     el.innerHTML = `<span class="text-amber-400 font-bold">🟡 Strong signals,</span> but sunlight drops during illumination interruptions.`;
   } else {
     el.innerHTML = `<span class="text-emerald-400 font-bold">🟢 All four dimensions</span> score well in this time window.`;
@@ -2000,8 +1990,6 @@ function initOrbitScene() {
 
   sunMesh = new THREE.Mesh(new THREE.SphereGeometry(3.2, 32, 32), new THREE.MeshBasicMaterial({ color: 0xfacc15 })); sunMesh.position.set(-18, 0, 0); orbitScene.add(sunMesh);
   sunMesh.add(new THREE.Mesh(new THREE.SphereGeometry(3.8, 32, 32), new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.22 })));
-  earthMesh = new THREE.Mesh(new THREE.SphereGeometry(1.1, 32, 32), new THREE.MeshPhongMaterial({ color: 0x0284c7, emissive: 0x082f49 })); orbitScene.add(earthMesh);
-  earthMesh.add(new THREE.Mesh(new THREE.SphereGeometry(1.25, 32, 32), new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.18 })));
 
   const cg = new THREE.CylinderGeometry(0, 2.1, 14, 32, 1, true); cg.rotateZ(-Math.PI / 2);
   const umbraCone = new THREE.Mesh(cg, new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }));
@@ -2011,8 +1999,41 @@ function initOrbitScene() {
   orbitScene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.35 })));
 
   moonGroup = new THREE.Group();
-  moonMesh = new THREE.Mesh(new THREE.SphereGeometry(0.55, 28, 28), new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.85, emissive: 0x000000, emissiveIntensity: 0 }));
-  moonGroup.add(moonMesh);
+  
+  // 引入 GLTFLoader 加载地球和月球真实模型
+  const loader = new THREE.GLTFLoader();
+
+  // 加载地球模型
+  loader.load('earth_model.glb', function(gltf) {
+    earthMesh = gltf.scene;
+    earthMesh.scale.set(0.5, 0.5, 0.5); // 根据实际模型大小可能需要微调
+    orbitScene.add(earthMesh);
+  }, undefined, function(error) {
+    // 失败时的 Fallback
+    earthMesh = new THREE.Mesh(new THREE.SphereGeometry(1.1, 32, 32), new THREE.MeshPhongMaterial({ color: 0x0284c7, emissive: 0x082f49 })); orbitScene.add(earthMesh);
+    earthMesh.add(new THREE.Mesh(new THREE.SphereGeometry(1.25, 32, 32), new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.18 })));
+  });
+
+  // 加载月球模型
+  loader.load('moon_model.glb', function(gltf) {
+    moonMesh = gltf.scene;
+    // 确保材质可以响应我们在 updateOrbitScene 里的变色操作
+    moonMesh.traverse((child) => {
+        if (child.isMesh && child.material) {
+            child.material = child.material.clone(); // 克隆材质以免影响原模型
+            child.material.emissiveIntensity = 0;
+            child.material.emissive.setHex(0x000000);
+        }
+    });
+    moonMesh.scale.set(0.5, 0.5, 0.5); // 根据实际模型大小可能需要微调
+    moonGroup.add(moonMesh);
+  }, undefined, function(error) {
+    // 失败时的 Fallback (挂载下载的无网格纹理图)
+    const moonTex = new THREE.TextureLoader().load('moon_texture.jpg');
+    moonMesh = new THREE.Mesh(new THREE.SphereGeometry(0.55, 28, 28), new THREE.MeshStandardMaterial({ map: moonTex, roughness: 0.85, emissive: 0x000000, emissiveIntensity: 0 }));
+    moonGroup.add(moonMesh);
+  });
+
   const pin = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 12), new THREE.MeshBasicMaterial({ color: 0x22d3ee })); pin.position.set(0, -0.6, 0); moonGroup.add(pin);
   orbitScene.add(moonGroup);
 
