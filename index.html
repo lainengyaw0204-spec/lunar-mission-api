@@ -583,10 +583,10 @@
     <div class="text-slate-600 text-[10px] mono" id="loadingElapsed">0.0s</div>
   </div>
 </div>
-
-<script>
  <img id="imgLrocSurface" src="lro_south_pole_1080p.jpg" style="display:none;">
 <img id="imgEarthTexture" src="The_Earth_seen_from_Apollo_17.jpg" style="display:none;">
+
+ <script>
 function nextWizard(type) {
   if (type === 'locations') {
     Store.setState({ selectedSiteIds: ['malapert', 'shackleton'], activeTW: 'TW-1', timeHours: 0 });
@@ -1777,15 +1777,18 @@ function renderPlannerRight() {
  const api = getApiResult(site.id, activeTW);
   const tSource = api?.site_info?.terrain_source || (site.id.startsWith('custom_') ? 'programmatic_illustrative' : 'lola_dem_synthetic');
   const sourceText = tSource === 'lola_dem_synthetic' ? 'LOLA DEM-based · 5m resolution' : 'Regional slope only · No NAC screening · Illustrative';
-  let srcDiv = document.getElementById('safeTerrainSource');
+    let srcDiv = document.getElementById('safeTerrainSource');
   if (!srcDiv) {
     srcDiv = document.createElement('div');
     srcDiv.id = 'safeTerrainSource';
     srcDiv.className = 'text-[8px] text-slate-500 mt-0.5 text-right';
     document.getElementById('dimSafe').parentElement.appendChild(srcDiv);
-   generateMissionSummary(site, sc, sky);
   }
   srcDiv.textContent = sourceText;
+  
+  // 把 sky 的定义提前
+  const sky = computeSkyState(site, activeTW, timeHours);
+  generateMissionSummary(site, sc, sky);
 
   // --- 新增 B-6: 锚定值 UI 元素 ---
   let anchorDiv = document.getElementById('anchorValueText');
