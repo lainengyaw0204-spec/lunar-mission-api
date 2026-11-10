@@ -341,7 +341,13 @@ def simulate_mission(lat: float, lon: float, h: np.ndarray, snr_base: float, sta
 # ═══════════════════════════════════════════════════════════════════════════
 app = FastAPI(title="Lunar Mission Browser API (v6.0)")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+EPHEMERIS_MODE = "ANALYTICAL" 
+EPHEMERIS_PRECISION = "±10 arcsec"
 
+@app.on_event("startup")
+async def startup_event():
+    print(f"[EPHEMERIS] {EPHEMERIS_MODE} engine active ({EPHEMERIS_PRECISION})")
+    
 class SiteInput(BaseModel):
     name: str
     lat: float = Field(..., ge=-90, le=-80)
@@ -357,7 +363,13 @@ class EvalRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "engine_version": "v6.1", "scenarios_cached": True, "dem_loaded": True}
+    return {
+        "status": "ok", 
+        "engine_version": "v6.1", 
+        "scenarios_cached": True, 
+        "dem_loaded": True,
+        "ephemeris_mode": EPHEMERIS_MODE  
+    }
 
 @app.get("/api/parameters")
 def get_params():
@@ -477,7 +489,25 @@ def site_evaluation(req: EvalRequest):
             SCENARIO_CACHE[cache_key] = result_data
             results.append(result_data)
             
-        return clean_json_types({"status": "success", "api_version": "1.0.0", "results": results})
+        formatted_results = []
+        for r in results:
+            formatted_results.append({
+                "siteInfo": r["site_info"],
+                "engineeringConstraints": r["engineering_constraints"],
+                "horizonProfile": r["horizon_profile"],
+                "timeline": r["timeline"],
+                "hourlyTelemetry": r["hourly_telemetry"],
+                "earthOccultationEvents": r["earth_occultation_events"],
+                "summary": r["summary"],
+                "dataProvenance": r["data_provenance"]
+            })
+        return clean_json_types({
+            "status": "success", 
+            "api_version": "1.0.0", 
+            "ephemeris_source": EPHEMERIS_MODE,          
+            "ephemeris_precision": EPHEMERIS_PRECISION,  
+            "results": formatted_results                  
+        })
     except Exception as e:
         raise HTTPException(status_code=500, detail={"error": str(e), "trace": traceback.format_exc()})
 
