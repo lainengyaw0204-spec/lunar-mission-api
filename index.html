@@ -308,6 +308,7 @@
         <div class="flex items-center gap-1">
           <button id="btnMoon3D" class="view-btn on" onclick="setMoonView('3d')">3D CRATER BOWL</button>
           <button id="btnMoon2D" class="view-btn off" onclick="setMoonView('2d')">2D SOUTH POLE MAP</button>
+          <button id="btnTerrainColor" class="view-btn off ml-2" onclick="toggleTerrainColor()">🚦 SLOPE ALERT</button>
         </div>
       </div>
       <div class="flex-1 relative rounded-lg overflow-hidden bg-[#03060f] border border-slate-800/80" style="min-height:0">
@@ -634,8 +635,9 @@ const Store = (function() {
     timeHours: 216,
     playing: false,
     speed: 1,
-    theme: 'normal',   // B-3: normal | colorblind | high-contrast
-    depth: 'L2'        // B-4: L1 | L2 | L3
+theme: 'normal',   // B-3: normal | colorblind | high-contrast
+    depth: 'L2',       // B-4: L1 | L2 | L3
+    terrainColorMode: 'real' // 'real' | 'slope'
   };
   const listeners = new Set();
 
@@ -1451,21 +1453,64 @@ let moon3DInit = false, moon3DScene, moon3DCam, moon3DRenderer, moon3DMesh, sunD
 let moon3DTargetTheta = 0.92, moon3DTargetPhi = 0.65;
 let moon3DCurrentTheta = 0.92, moon3DCurrentPhi = 0.65;
 
-function createCraterBowlGeometry(siteId) {
-  const N_AZ = 180, N_RAD = 24, maxR = 2.2, positions = [], colors = [], indices = [];
+function createCraterBowlGeometry(siteId, colorMode = 'real') {
+  const N_AZ = 180, N_RAD = 24, maxR = 2.2, positions = [], indices = [];
+  let heights = []; // 临时存储高度用于计算坡度
+
+  // 1. 先算出所有点的高度
   for (let ir = 0; ir <= N_RAD; ir++) {
+    heights[ir] = [];
     const frac = ir / N_RAD, r = frac * maxR;
     for (let ia = 0; ia <= N_AZ; ia++) {
-      const azDeg = (ia / N_AZ) * 360, rad = (azDeg - 90) * Math.PI / 180;
+      const azDeg = (ia / N_AZ) * 360;
       const horizonEl = Math.max(-1, horizonAt(siteId, azDeg));
       const wallCurve = Math.pow(Math.max(0, (frac - 0.15) / 0.85), 1.65);
       const microRough = (frac > 0.1 && frac < 0.95) ? 0.03 * Math.sin(azDeg * 0.25 + ir * 0.9) : 0;
       const y = wallCurve * (horizonEl * 0.14) + microRough;
-      positions.push(Math.cos(rad) * r, y, Math.sin(rad) * r);
-      const hNorm = Math.min(1, Math.max(0, (y + 0.05) / 0.95));
-      colors.push(0.18 + hNorm * 0.45, 0.24 + hNorm * 0.50, 0.34 + hNorm * 0.55);
+      heights[ir][ia] = { y, r };
     }
   }
+
+  // 2. 根据高度和模式生成位置和颜色
+  const colors = [];
+  for (let ir = 0; ir <= N_RAD; ir++) {
+    for (let ia = 0; ia <= N_AZ; ia++) {
+      const azDeg = (ia / N_AZ) * 360, rad = (azDeg - 90) * Math.PI / 180;
+      const { y, r } = heights[ir][ia];
+      
+      // 计算位置
+      positions.push(Math.cos(rad) * r, y, Math.sin(rad) * r);
+
+      // 计算颜色
+      if (colorMode === 'slope') {
+        // 简易坡度估算 (基于相邻网格点的高度差 / 距离差)
+        let dh_dr = 0, dh_daz = 0;
+        if (ir > 0 && ir < N_RAD) {
+          const dr = heights[ir+1][ia].r - heights[ir-1][ia].r;
+          dh_dr = (heights[ir+1][ia].y - heights[ir-1][ia].y) / (dr || 0.01);
+        }
+        if (ia > 0 && ia < N_AZ) {
+          const daz_rad = (2 * Math.PI) / N_AZ;
+          dh_daz = (heights[ir][ia+1].y - heights[ir][ia-1].y) / (r * daz_rad || 0.01);
+        }
+        const slope = Math.atan(Math.sqrt(dh_dr*dh_dr + dh_daz*dh_daz)) * 180 / Math.PI;
+
+        // NASA 安全阈值着色：<5°绿, 5-10°黄, >10°红
+        if (slope < 5) {
+          colors.push(0.2, 0.8, 0.4); // 绿
+        } else if (slope < 10) {
+          colors.push(1.0, 0.8, 0.2); // 黄
+        } else {
+          colors.push(1.0, 0.2, 0.2); // 红
+        }
+      } else {
+        // 真实色彩 (原来的灰色地形)
+        const hNorm = Math.min(1, Math.max(0, (y + 0.05) / 0.95));
+        colors.push(0.18 + hNorm * 0.45, 0.24 + hNorm * 0.50, 0.34 + hNorm * 0.55);
+      }
+    }
+  }
+
   const stride = N_AZ + 1;
   for (let ir = 0; ir < N_RAD; ir++) {
     for (let ia = 0; ia < N_AZ; ia++) {
@@ -1491,8 +1536,8 @@ function initMoon3D() {
   container.innerHTML = ''; container.appendChild(moon3DRenderer.domElement);
 
   const site = getSite(); lastBuilt3DSiteId = site.id;
-  moon3DMesh = new THREE.Mesh(createCraterBowlGeometry(site.id), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.08, flatShading: true, side: THREE.DoubleSide }));
-  moon3DScene.add(moon3DMesh);
+  const cMode = Store.getState().terrainColorMode || 'real';
+  moon3DMesh = new THREE.Mesh(createCraterBowlGeometry(site.id, cMode), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.08, flatShading: true, side: THREE.DoubleSide }));  moon3DScene.add(moon3DMesh);
 
   const ringGeo = new THREE.RingGeometry(2.18, 2.22, 96); ringGeo.rotateX(-Math.PI / 2);
   const ringMesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x22d3ee, side: THREE.DoubleSide, transparent: true, opacity: 0.45 }));
@@ -1539,10 +1584,12 @@ function updateMoon3DTerrain() {
   if (!moon3DMesh) return;
   const site = getSite();
   const { activeTW, timeHours } = Store.getState();
-  if (lastBuilt3DSiteId !== site.id) {
+  const cMode = Store.getState().terrainColorMode || 'real';
+  const buildHash = site.id + '-' + cMode;
+  if (lastBuilt3DSiteId !== buildHash) {
     moon3DMesh.geometry.dispose();
-    moon3DMesh.geometry = createCraterBowlGeometry(site.id);
-    lastBuilt3DSiteId = site.id;
+    moon3DMesh.geometry = createCraterBowlGeometry(site.id, cMode);
+    lastBuilt3DSiteId = buildHash;
   }
   const sky = computeSkyState(site, activeTW, timeHours);
   const sRad = (sky.sunAz - 90) * Math.PI / 180, sEl = Math.max(0, sky.sunEl) * Math.PI / 180;
@@ -1571,6 +1618,25 @@ function setMoonView(moonView) {
       }
     }
   });
+}
+  function toggleTerrainColor() {
+  const { terrainColorMode } = Store.getState();
+  const newMode = terrainColorMode === 'real' ? 'slope' : 'real';
+  Store.setState({ terrainColorMode: newMode });
+  
+  const btn = document.getElementById('btnTerrainColor');
+  if (btn) {
+    btn.className = newMode === 'slope' ? 'view-btn on ml-2' : 'view-btn off ml-2';
+  }
+  
+  const note = document.getElementById('terrainSubNote');
+  if (note) {
+    note.textContent = newMode === 'slope' 
+      ? '🚦 NASA Slope Safety: Green < 5° | Yellow 5-10° | Red > 10° (Danger)'
+      : 'Drag 3D bowl to rotate · Yellow ray = Sun · Cyan ray = Earth';
+  }
+  
+  updateMoon3DTerrain(); // 强制刷新 3D 渲染
 }
 function drawHorizonRadar(canvas, peakLabelEl) {
   if (!canvas) return;
