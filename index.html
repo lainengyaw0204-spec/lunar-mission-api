@@ -429,7 +429,16 @@
       <div class="panel-title">◈ 20-SCENARIO MATRIX</div>
       <div id="matrixPlanner" class="text-[10px]"></div>
     </div>
-    <div data-depth="L3">
+    <!-- 🚀 路径规划与通信检查点面板 -->
+    <div data-depth="L2" class="border border-cyan-500/30 rounded-lg p-2 bg-slate-950/60">
+      <div class="flex justify-between items-center mb-1">
+        <div class="panel-title" style="margin-bottom:0">◈ ROUTE & COMM LINK</div>
+        <button onclick="clearRoute()" class="text-[9px] text-slate-400 hover:text-white border border-slate-700 px-1.5 py-0.5 rounded">CLEAR</button>
+      </div>
+      <div class="text-[9px] text-slate-400 mb-2 leading-tight">Click anywhere on the 2D Map to set a target. Auto-evaluates 10 waypoints for Earth LOS.</div>
+      <div id="routeCheckpoints" class="flex gap-1 flex-wrap"></div>
+    </div>
+   <div data-depth="L3">
       <div class="panel-title">◈ TRADE SPACE (POWER VS COMM)</div>
       <div class="h-28 bg-slate-950/80 border border-slate-700/60 rounded relative mt-1">
         <canvas id="tradeSpaceCanvas" class="w-full h-full"></canvas>
@@ -1614,6 +1623,7 @@ function setMoonView(moonView) {
   document.getElementById('btnMoon2D').className = moonView === '2d' ? 'view-btn on' : 'view-btn off';
   document.getElementById('btnMoon3D').className = moonView === '3d' ? 'view-btn on' : 'view-btn off';
   Store.setState({ moonView });
+ 
 
   requestAnimationFrame(() => {
     if (moonView === '2d') drawMoon2DMapPlanner();
@@ -1749,8 +1759,80 @@ function drawMoon2DMapPlanner() {
     }
   });
 
+  // 如果存在目标点，画线和检查点
+  if (currentTarget) {
+    const site = getSite();
+    const startPt = { x: cx, y: cy }; // 着陆点在中心
+    const colatT = 90 - Math.abs(currentTarget.lat);
+    const rT = R * (colatT / 5.2);
+    const aT = (currentTarget.lon - 90) * Math.PI / 180;
+    const targetPt = { x: cx + Math.cos(aT) * rT, y: cy + Math.sin(aT) * rT };
+
+    // 画虚线路径
+    ctx.beginPath();
+    ctx.setLineDash([4, 4]);
+    ctx.moveTo(startPt.x, startPt.y);
+    ctx.lineTo(targetPt.x, targetPt.y);
+    ctx.strokeStyle = '#22d3ee';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 10 个通信检查点
+    const activeTW = Store.getState().activeTW;
+    const activeT = Store.getState().timeHours;
+    let html = '';
+    
+    for (let i = 1; i <= 10; i++) {
+      const t = i / 10;
+      const px = startPt.x + (targetPt.x - startPt.x) * t;
+      const py = startPt.y + (targetPt.y - startPt.y) * t;
+      
+      // 插值计算点坐标
+      const ptLat = site.lat + (currentTarget.lat - site.lat) * t;
+      const ptLon = site.lon + (currentTarget.lon - site.lon) * t;
+      
+      // 评估通信
+      const sky = computeSkyState({ lat: ptLat, lon: ptLon, id: site.id }, activeTW, activeT);
+      const isPass = sky.earthOK;
+      
+      // 绘制
+      ctx.beginPath();
+      ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = isPass ? '#10b981' : '#ef4444';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
+      // 生成侧边栏 UI
+      html += `<div class="flex-1 min-w-[18px] text-center text-[9px] mono rounded border ${isPass ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-red-500/20 text-red-300 border-red-500/40'}" title="WP${i}: ${isPass ? 'LOS OK' : 'BLOCKED'}">${i}</div>`;
+    }
+    
+    // 画目标点
+    ctx.beginPath();
+    ctx.arc(targetPt.x, targetPt.y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#facc15';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 更新 UI
+    const container = document.getElementById('routeCheckpoints');
+    if (container && container.innerHTML !== html) {
+      container.innerHTML = html;
+    }
+  } else {
+    const container = document.getElementById('routeCheckpoints');
+    if (container) container.innerHTML = '<div class="text-slate-500 text-[10px] italic">No route defined.</div>';
+  }
+
   canvas.onclick = e => {
     const b = canvas.getBoundingClientRect(), mx = e.clientX - b.left, my = e.clientY - b.top;
+    
+    // 先判断是否点中了已有的站点
+    let hitSite = false;
     for (const pt of clickable) {
       if (Math.hypot(mx - pt.x, my - pt.y) < 18) {
         let newSel = [...Store.getState().selectedSiteIds];
@@ -1761,7 +1843,17 @@ function drawMoon2DMapPlanner() {
           if (newSel.length > 2) newSel.shift();
         }
         Store.setState({ selectedSiteIds: newSel });
+        hitSite = true;
         break; 
+      }
+    }
+    
+    // 如果没有点中站点，则在地图空白处设置目标点
+    if (!hitSite) {
+      const latlon = xyToLatLon(mx, my, cx, cy, R);
+      if (latlon) {
+        currentTarget = latlon;
+        drawMoon2DMapPlanner(); // 立即重绘
       }
     }
   };
