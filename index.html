@@ -348,6 +348,13 @@
 
   <aside class="glass p-3 flex flex-col gap-2.5 scroll-y" style="min-height:0">
 
+  
+    <div id="l1VerdictCard" class="p-3 rounded-lg text-center transition-colors duration-300" style="background: rgba(16,185,129,0.1); border: 2px solid #10b981;">
+      <div class="text-[10px] uppercase tracking-widest text-slate-300 mb-1">MISSION VERDICT</div>
+      <div class="text-3xl font-bold text-emerald-400" id="l1VerdictText">GO</div>
+      <div class="text-[10px] text-slate-400 mt-1">基于所选时间窗口的工程约束评估</div>
+    </div>
+
     <div class="border border-cyan-500/20 rounded-lg p-2.5 bg-slate-950/60">
       <div class="flex items-start justify-between">
         <div>
@@ -394,7 +401,7 @@
       </div>
     </div>
 
-    <div class="flex flex-col gap-1" style="height: 225px;">
+<div class="flex flex-col gap-1" style="height: 225px;" data-depth="L2">
       <div class="flex items-baseline justify-between">
         <span class="panel-title" style="margin-bottom:0">◈ 360° HORIZON MASK RADAR</span>
         <span id="horizonPeakNote" class="text-[10px] text-cyan-400/80 mono">—</span>
@@ -404,7 +411,7 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-2 gap-2 text-[10px]">
+    <div class="grid grid-cols-2 gap-2 text-[10px]" data-depth="L3">
       <div class="border border-slate-700/60 rounded p-1.5 bg-slate-950/50">
         <div class="text-slate-400 text-[9px]">☀️ SUN VECTOR (ENU)</div>
         <div id="seSunAz" class="text-yellow-300 mono font-bold">—</div>
@@ -417,11 +424,11 @@
       </div>
     </div>
 
-<div>
+<div data-depth="L2">
       <div class="panel-title">◈ 20-SCENARIO MATRIX</div>
       <div id="matrixPlanner" class="text-[10px]"></div>
     </div>
-    <div>
+    <div data-depth="L3">
       <div class="panel-title">◈ TRADE SPACE (POWER VS COMM)</div>
       <div class="h-28 bg-slate-950/80 border border-slate-700/60 rounded relative mt-1">
         <canvas id="tradeSpaceCanvas" class="w-full h-full"></canvas>
@@ -1765,6 +1772,32 @@ function renderPlannerRight() {
   const sc = computeScore(site, activeTW);
   const rl = riskOf(sc.assessment, site.riskLevel);
 
+  const l1Card = document.getElementById('l1VerdictCard');
+  const l1Text = document.getElementById('l1VerdictText');
+  if (l1Card && l1Text) {
+    if (sc.ec07_pass === false) {
+      l1Card.style.background = 'rgba(239,68,68,0.15)'; // Red
+      l1Card.style.borderColor = '#ef4444';
+      l1Text.textContent = 'NO-GO';
+      l1Text.className = 'text-3xl font-bold text-red-500 pulse-red';
+    } else if (sc.total >= 75) {
+      l1Card.style.background = 'rgba(16,185,129,0.15)'; // Green
+      l1Card.style.borderColor = '#10b981';
+      l1Text.textContent = 'GO (OPTIMAL)';
+      l1Text.className = 'text-3xl font-bold text-emerald-400';
+    } else if (sc.total >= 50) {
+      l1Card.style.background = 'rgba(234,179,8,0.15)'; // Yellow
+      l1Card.style.borderColor = '#eab308';
+      l1Text.textContent = 'CONDITIONAL';
+      l1Text.className = 'text-3xl font-bold text-yellow-400';
+    } else {
+      l1Card.style.background = 'rgba(239,68,68,0.15)'; // Red for low score
+      l1Card.style.borderColor = '#ef4444';
+      l1Text.textContent = 'HIGH RISK';
+      l1Text.className = 'text-3xl font-bold text-red-500';
+    }
+  }
+
   document.getElementById('scoreName').textContent = site.name;
   const customWarn = document.getElementById('customWarn');
   if (site.id.startsWith('custom_')) {
@@ -2216,8 +2249,21 @@ function updateUI() {
 
   if (orbitInit && document.getElementById('orbitModal').style.display === 'flex') updateOrbitScene();
   
- // B-4 信息深度 & B-3 视觉按钮动态高亮同步
+  // B-4 信息深度 & B-3 视觉按钮动态高亮同步
   const { depth, theme } = Store.getState();
+  
+  // 🚀 核心功能：根据 L1/L2/L3 隐藏复杂面板
+  document.querySelectorAll('[data-depth]').forEach(el => {
+    const elDepth = el.getAttribute('data-depth');
+    if (depth === 'L1') {
+      el.style.display = 'none'; // L1 极简模式：全部隐藏
+    } else if (depth === 'L2') {
+      el.style.display = elDepth === 'L3' ? 'none' : (el.classList.contains('flex') ? 'flex' : 'block'); // L2 隐藏 L3
+    } else {
+      el.style.display = el.classList.contains('flex') ? 'flex' : 'block'; // L3 全开
+    }
+  });
+
   ['L1', 'L2', 'L3'].forEach(lv => {
     const b = document.getElementById('btn-depth-' + lv);
     if (b) {
