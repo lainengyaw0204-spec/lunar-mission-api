@@ -1711,6 +1711,29 @@ function drawHorizonRadar(canvas, peakLabelEl) {
   if (peakLabelEl) peakLabelEl.textContent = `Peak +${peak.toFixed(1)}°`;
 }
 
+let currentTarget = null; // { lat, lon }
+
+function clearRoute() {
+  currentTarget = null;
+  drawMoon2DMapPlanner(); // 重绘 2D 地图以清除线条
+  const container = document.getElementById('routeCheckpoints');
+  if (container) container.innerHTML = '<div class="text-slate-500 text-[10px] italic">No route defined.</div>';
+}
+
+// 极坐标投影反解：将点击的 X/Y 像素转换为经纬度
+function xyToLatLon(px, py, cx, cy, R) {
+  const dx = px - cx, dy = py - cy;
+  const r = Math.hypot(dx, dy);
+  if (r > R) return null; // 点击超出了极地圆的边界
+  
+  const colat = (r / R) * 5.2; 
+  const lat = -(90 - colat);
+  const angle = Math.atan2(dy, dx); // 弧度
+  let lon = (angle * 180 / Math.PI) + 90;
+  if (lon > 180) lon -= 360;
+  return { lat, lon };
+}
+
 function drawMoon2DMapPlanner() {
   const canvas = document.getElementById('moon2DCanvas');
   const { moonView, selectedSiteIds } = Store.getState();
