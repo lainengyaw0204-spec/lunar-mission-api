@@ -1327,12 +1327,20 @@ const arcY = (el, az) => {
 
   // 5. 绘制真实物理地平线 & LROC 月面图片做底图
   ctx.beginPath();
-  ctx.moveTo(0, H);
+  ctx.moveTo(0, H); // 从画布左下角开始
+  
   for (let x = 0; x <= W; x += 2) {
     const rel = ((x / W) - 0.5) * 130;
     const el = horizonAt(renderSite.id, targetAz + rel);
-    ctx.lineTo(x, arcY(el, rel)); // 地形也按弧形扭曲
+    
+    // 核心修复：将 y 坐标严格限制在画布高度以内，防止无限下坠
+    let yPos = arcY(el, rel);
+    yPos = Math.max(0, Math.min(H, yPos)); // 限制在 [0, H] 之间
+    
+    ctx.lineTo(x, yPos);
   }
+  
+  // 画到右下角再闭合，确保填充区域是一个完整的闭合多边形
   ctx.lineTo(W, H);
   ctx.closePath();
   
